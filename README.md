@@ -1,4 +1,4 @@
-# Machine Learning for Portfolio Optimisation
+# Prophet Forecasting for Portfolio Optimisation
 
 An end-to-end machine learning project that forecasts stock and asset prices using LightGBM (Gradient Boosting) models, then applies Markowitz portfolio optimization to rebalance portfolios based on these forecasts.
 
