@@ -1,1 +1,1 @@
-"""Tests for portfolio optimization package."""
+"""Tests for portfolio optimisation package."""

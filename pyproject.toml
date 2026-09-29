@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "Prophet-Forecasting-For-Portfolio-Optimisation"
 version = "0.1.0"
-description = "Prophet-based stock price forecasting with Markowitz portfolio optimization"
+description = "Prophet-based stock price forecasting with Markowitz portfolio optimisation"
 authors = ["egor@egorhowell.com"]
 readme = "README.md"
 packages = [{include = "src"}]

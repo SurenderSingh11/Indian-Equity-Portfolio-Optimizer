@@ -1,13 +1,13 @@
 # Prophet Forecasting for Portfolio Optimisation
 
-An end-to-end machine learning project that forecasts stock and asset prices using LightGBM (Gradient Boosting) models, then applies Markowitz portfolio optimization to rebalance portfolios based on these forecasts.
+An end-to-end machine learning project that forecasts stock and asset prices using LightGBM (Gradient Boosting) models, then applies Markowitz portfolio optimisation to rebalance portfolios based on these forecasts.
 
 ## Project Overview
 
 This project combines machine learning-based time series forecasting with modern portfolio theory to create an automated trading and portfolio management system. The workflow consists of two main components:
 
 1. **LightGBM Price Forecasting**: Uses gradient boosting to predict future asset prices
-2. **Markowitz Portfolio Optimization**: Optimizes portfolio allocation based on forecasted returns and risk
+2. **Markowitz Portfolio Optimisation**: Optimises portfolio allocation based on forecasted returns and risk
 
 ## Components
 
@@ -33,11 +33,11 @@ LightGBM is excellent for tabular time series data because it:
 - Output: Forecasted prices for each asset in the portfolio for the next time period
 - Training: The model learns from historical data to minimize prediction error
 
-### 2. Markowitz Portfolio Optimization
+### 2. Markowitz Portfolio Optimisation
 
-**What is Markowitz Portfolio Optimization?**
+**What is Markowitz Portfolio Optimisation?**
 
-Markowitz portfolio optimization, also known as Modern Portfolio Theory (MPT), is a mathematical framework for constructing optimal portfolios. Developed by Harry Markowitz in 1952, it balances the trade-off between expected returns and risk.
+Markowitz portfolio optimisation, also known as Modern Portfolio Theory (MPT), is a mathematical framework for constructing optimal portfolios. Developed by Harry Markowitz in 1952, it balances the trade-off between expected returns and risk.
 
 **Key Concepts:**
 
@@ -46,7 +46,7 @@ Markowitz portfolio optimization, also known as Modern Portfolio Theory (MPT), i
 - **Correlation**: How assets move relative to each other
 - **Efficient Frontier**: The set of optimal portfolios offering the highest expected return for a given level of risk
 
-**The Optimization Problem:**
+**The Optimisation Problem:**
 
 The Markowitz model solves:
 
@@ -69,7 +69,7 @@ Where:
 
 1. **Input**: Forecasted returns (derived from LightGBM price predictions) for each asset
 2. **Risk Estimation**: Historical covariance matrix calculated from asset returns
-3. **Optimization**: Solves for optimal weights that maximize risk-adjusted returns
+3. **Optimisation**: Solves for optimal weights that maximise risk-adjusted returns
 4. **Output**: Recommended portfolio allocation (weights for each asset)
 5. **Rebalancing**: Portfolio is rebalanced based on these optimal weights
 
@@ -88,7 +88,7 @@ Return Calculation (from prices)
     ↓
 Expected Returns & Risk Metrics
     ↓
-Markowitz Optimization
+Markowitz Optimisation
     ↓
 Optimal Portfolio Weights
     ↓
@@ -98,7 +98,7 @@ Portfolio Rebalancing
 ## Key Features
 
 - **Machine Learning Forecasting**: LightGBM gradient boosting for price prediction
-- **Risk-Aware Optimization**: Incorporates covariance and correlation for risk management
+- **Risk-Aware Optimisation**: Incorporates covariance and correlation for risk management
 - **Automated Rebalancing**: Systematic portfolio adjustments based on forecasts
 - **Backtesting Framework**: Evaluate strategy performance on historical data
 - **Multi-Asset Support**: Handle portfolios with multiple stocks/assets simultaneously
@@ -113,7 +113,7 @@ Machine-Learning-For-Portfolio-Optimisation/
 ├── src/
 │   ├── data/
 │   ├── models/
-│   ├── optimization/
+│   ├── optimisation/
 │   └── utils/
 ├── notebooks/
 ├── tests/
@@ -160,7 +160,7 @@ poetry install
 
 - **Machine Learning**: LightGBM for gradient boosting price prediction
 - **Data Processing**: Pandas, NumPy for data manipulation
-- **Optimization**: SciPy for portfolio optimization solvers
+- **Optimisation**: SciPy for portfolio optimisation solvers
 - **Data Sources**: yfinance or similar APIs for stock data
 - **Visualization**: Matplotlib, Seaborn for results visualization
 

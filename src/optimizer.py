@@ -55,6 +55,6 @@ def optimize_portfolio_mean_variance(
     )
 
     if not result.success:
-        raise ValueError(f"Optimization failed: {result.message}")
+        raise ValueError(f"Optimisation failed: {result.message}")
 
     return pd.Series(result.x, index=tickers)

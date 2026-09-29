@@ -1,4 +1,4 @@
-"""Tests for portfolio optimization module."""
+"""Tests for portfolio optimisation module."""
 
 import numpy as np
 import pandas as pd
@@ -9,8 +9,8 @@ from src.optimizer import (
 )
 
 
-class TestPortfolioOptimization:
-    """Test portfolio optimization functions."""
+class TestPortfolioOptimisation:
+    """Test portfolio optimisation functions."""
 
     def test_calculate_mean_variance(self) -> None:
         """Test calculating mean and covariance from Returns columns."""
@@ -63,7 +63,7 @@ class TestPortfolioOptimization:
         assert "ASSET1" in mean_returns.index
 
     def test_optimize_portfolio_mean_variance_basic(self) -> None:
-        """Test basic portfolio optimization."""
+        """Test basic portfolio optimisation."""
         dates = pd.date_range("2024-01-01", periods=100, freq="D")
 
         df1 = pd.DataFrame(
@@ -92,7 +92,7 @@ class TestPortfolioOptimization:
         assert "ASSET2" in optimal_weights.index
 
     def test_optimize_portfolio_mean_variance_with_minimum_allocation(self) -> None:
-        """Test portfolio optimization with custom minimum allocation."""
+        """Test portfolio optimisation with custom minimum allocation."""
         dates = pd.date_range("2024-01-01", periods=100, freq="D")
 
         df1 = pd.DataFrame(
@@ -124,7 +124,7 @@ class TestPortfolioOptimization:
         assert all(w <= 1.0 for w in optimal_weights)
 
     def test_optimize_portfolio_mean_variance_single_asset(self) -> None:
-        """Test optimization with single asset."""
+        """Test optimisation with single asset."""
         dates = pd.date_range("2024-01-01", periods=100, freq="D")
         df = pd.DataFrame(
             {

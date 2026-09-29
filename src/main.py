@@ -1,4 +1,4 @@
-"""Main entry point for portfolio optimization."""
+"""Main entry point for portfolio optimisation."""
 
 import logging
 
@@ -14,14 +14,14 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 
-def run_optimization(
+def run_optimisation(
     tickers: list[str],
     start_date: str = START_DATE,
     end_date: str = END_DATE,
     minimum_allocation: float | None = None,
 ) -> dict:
     """
-    Run portfolio optimization: pull data, predict, calculate allocation, and log result.
+    Run portfolio optimisation: pull data, predict, calculate allocation, and log result.
 
     Args:
         tickers: List of stock ticker symbols
@@ -30,8 +30,8 @@ def run_optimization(
         minimum_allocation: Minimum allocation per asset. Defaults to MINIMUM_ALLOCATION.
 
     Returns:
-        Dictionary containing optimization results:
-        - date: Date optimization was run
+        Dictionary containing optimisation results:
+        - date: Date optimisation was run
         - predictions: Dict of predicted prices
         - current_prices: Dict of current prices
         - predicted_returns: Dict of predicted returns
@@ -41,13 +41,13 @@ def run_optimization(
         minimum_allocation = MINIMUM_ALLOCATION
 
     as_of_date = pd.to_datetime(end_date).date()
-    logger.info(f"Starting portfolio optimization for tickers: {tickers} as of {as_of_date}")
+    logger.info(f"Starting portfolio optimisation for tickers: {tickers} as of {as_of_date}")
 
     # 1. Extract historical data
     logger.info("Extracting historical data...")
     raw_data = extract_data(tickers, start_date=start_date, end_date=end_date)
     if not raw_data:
-        logger.warning("No data extracted. Exiting optimization.")
+        logger.warning("No data extracted. Exiting optimisation.")
         return {}
 
     # 2. Preprocess historical data
@@ -76,7 +76,7 @@ def run_optimization(
 
     # 8. Log results
     logger.info("=" * 70)
-    logger.info("Portfolio Optimization Results")
+    logger.info("Portfolio Optimisation Results")
     logger.info("=" * 70)
     logger.info(f"Date: {as_of_date}")
 
@@ -105,10 +105,10 @@ def main() -> None:
     """Main CLI entry point."""
     tickers = ["KO", "BBVA", "REP.MC", "MSFT", "AAPL"]
 
-    result = run_optimization(tickers=tickers)
+    result = run_optimisation(tickers=tickers)
 
     print("\n" + "=" * 70)
-    print("Portfolio Optimization Complete")
+    print("Portfolio Optimisation Complete")
     print("=" * 70)
     print(f"Date: {result['date']}")
     print(f"Weights: {result['weights']}")

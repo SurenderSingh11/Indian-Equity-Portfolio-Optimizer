@@ -1,4 +1,4 @@
-"""Settings and constants for portfolio optimization."""
+"""Settings and constants for portfolio optimisation."""
 from datetime import datetime
 
 # Risk parameters

@@ -1,0 +1,100 @@
+name: Daily Portfolio Optimisation
+
+on:
+  schedule:
+    # Run daily at 9:00 AM UTC (adjust timezone as needed)
+    - cron: '0 9 * * *'
+  workflow_dispatch:  # Allows manual triggering from GitHub UI
+
+jobs:
+  optimize:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Cache Poetry dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pypoetry
+          key: poetry-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            poetry-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: poetry install --no-interaction
+
+      - name: Create results directory
+        run: mkdir -p results
+
+      - name: Run portfolio optimisation and save results
+        run: |
+          poetry run python << 'EOF' || true
+          import json
+          import sys
+          import os
+          from datetime import date
+          from src.main import run_optimisation
+          
+          try:
+              # Get today's date
+              today = date.today().isoformat()
+              
+              # Run optimisation
+              result = run_optimisation(tickers=["KO", "BBVA", "REP.MC", "MSFT", "AAPL"])
+              
+              # Ensure results directory exists
+              os.makedirs('results', exist_ok=True)
+              
+              # Print summary to text file
+              with open(f'results/optimisation-{today}.txt', 'w') as txt_file:
+                  txt_file.write("\n" + "=" * 70 + "\n")
+                  txt_file.write("Portfolio Optimisation Complete\n")
+                  txt_file.write("=" * 70 + "\n")
+                  txt_file.write(f"Date: {result.get('date', 'N/A')}\n")
+                  txt_file.write(f"Weights: {result.get('weights', {})}\n")
+              
+              # Convert date to ISO string for JSON serialization
+              if 'date' in result and hasattr(result['date'], 'isoformat'):
+                  result_copy = result.copy()
+                  result_copy['date'] = result['date'].isoformat()
+              else:
+                  result_copy = result
+              
+              # Save JSON file
+              with open(f'results/optimisation-{today}.json', 'w') as json_file:
+                  json.dump(result_copy, json_file, indent=2, default=str)
+          except Exception as e:
+              print(f"Error during optimisation: {e}", file=sys.stderr)
+              import traceback
+              traceback.print_exc()
+              sys.exit(1)
+          EOF
+        continue-on-error: true
+
+      - name: Display results
+        if: always()
+        run: |
+          echo "## Portfolio Optimisation Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f results/optimisation-*.txt ]; then
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            cat results/optimisation-*.txt >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          else
+            echo "No results file found" >> $GITHUB_STEP_SUMMARY
+          fi
+
