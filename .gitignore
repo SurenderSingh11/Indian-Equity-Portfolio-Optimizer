@@ -1,9 +1,35 @@
-# Python
+# ==========================================
+# Environment Variables & Secrets (CRITICAL)
+# ==========================================
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+
+# Streamlit Local Config & Secrets
+.streamlit/secrets.toml
+
+# ==========================================
+# Python & Virtual Environments
+# ==========================================
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
+.python-version
+
+# Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Distributions & Packaging
 build/
 develop-eggs/
 dist/
@@ -22,57 +48,51 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
-.python-version
 
 # Poetry
 poetry.lock
 .poetry/
 
-# Virtual environments
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
-# IDE
+# ==========================================
+# IDEs, Editors & OS Files
+# ==========================================
 .idea/
 .vscode/
 *.swp
 *.swo
 *~
 .DS_Store
+Thumbs.db
+ehthumbs.db
 
-# Jupyter Notebook
-.ipynb_checkpoints
-*.ipynb_checkpoints/
-
-# pytest
+# ==========================================
+# Testing, Coverage & Linters
+# ==========================================
 .pytest_cache/
 .coverage
+.coverage.*
 htmlcov/
 .tox/
 .hypothesis/
-
-# mypy
 .mypy_cache/
 .dmypy.json
 dmypy.json
-
-# ruff
 .ruff_cache/
 
-# Environment variables
-.env
-.env.local
+# ==========================================
+# Jupyter Notebooks
+# ==========================================
+.ipynb_checkpoints
+*.ipynb_checkpoints/
 
-# Logs
+# ==========================================
+# Logs, Databases & Temporary Data
+# ==========================================
 *.log
 logs/
-
-# OS
-.DS_Store
-Thumbs.db
-
+*.sqlite3
+*.db
+*.csv
+*.parquet
+*.json
+!pyproject.toml

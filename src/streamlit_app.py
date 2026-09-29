@@ -1,25 +1,115 @@
-"""Streamlit dashboard for Prophet-based portfolio forecasts."""
+"""Modernized Streamlit dashboard for Indian Stock Portfolio Forecasts with Entra ID Authentication."""
 
 from __future__ import annotations
 
+import base64
 import json
-from datetime import date
-from functools import lru_cache
-
-import altair as alt
+import os
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
+from dotenv import load_dotenv
+from streamlit_oauth import OAuth2Component
 
 from src.database import get_supabase_client
 from src.settings import SUPABASE_TABLE_NAME
 
-st.set_page_config(page_title="Portfolio Forecast Dashboard", layout="wide")
+# Load environment variables
+load_dotenv()
+
+# Page configuration
+st.set_page_config(
+    page_title="NSE Portfolio Allocator | Cloud AI",
+    layout="wide",
+    page_icon="📈",
+    initial_sidebar_state="expanded",
+)
+
+# Environment & OAuth configuration
+TENANT_ID = os.getenv("TENANT_ID", "ebe591be-cada-4eef-98d8-72b8ce09b40a")
+CLIENT_ID = os.getenv("CLIENT_ID", "d04c62a8-1f57-4202-8097-0198b4c385e0")
+CLIENT_SECRET = os.getenv("CLIENT_SECRET", "VjH8Q~_BSWAj4q4IxgPdu7kbaMPa-RM5Mg9TobpL")
+
+AUTHORIZE_URL = f"https://login.microsoftonline.com/{TENANT_ID}/oauth2/v2.0/authorize"
+TOKEN_URL = f"https://login.microsoftonline.com/{TENANT_ID}/oauth2/v2.0/token"
+REFRESH_TOKEN_URL = f"https://login.microsoftonline.com/{TENANT_ID}/oauth2/v2.0/token"
+REDIRECT_URI = "http://localhost:8501/component/streamlit_oauth.authorize_button"
+
+# Initialize OAuth2 Component
+oauth2 = OAuth2Component(
+    client_id=CLIENT_ID,
+    client_secret=CLIENT_SECRET,
+    authorize_endpoint=AUTHORIZE_URL,
+    token_endpoint=TOKEN_URL,
+    refresh_token_endpoint=REFRESH_TOKEN_URL,
+    revoke_token_endpoint=None,
+)
+
+# Session state initialization
+if "auth_token" not in st.session_state:
+    st.session_state["auth_token"] = None
 
 
+def decode_jwt_payload(token_str: str) -> dict:
+    """Helper to decode JWT payload without external libraries."""
+    try:
+        parts = token_str.split(".")
+        if len(parts) >= 2:
+            padded = parts[1] + "=" * (-len(parts[1]) % 4)
+            decoded_bytes = base64.b64decode(padded)
+            return json.loads(decoded_bytes.decode("utf-8"))
+    except Exception:
+        pass
+    return {}
+
+
+# --- 1. UNAUTHENTICATED VIEW ---
+if not st.session_state["auth_token"]:
+    st.markdown("<h1 style='text-align: center;'>🔒 Enterprise Portfolio Optimiser</h1>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center;'>Prophet ML Forecasting & Markowitz Portfolio Optimisation Engine</p>", unsafe_allow_html=True)
+    st.divider()
+
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.info("Please authenticate with your Microsoft Entra ID organizational account to view analytics.")
+        result = oauth2.authorize_button(
+            name="🔑 Sign in with Microsoft Entra ID",
+            redirect_uri=REDIRECT_URI,
+            scope="openid profile email https://graph.microsoft.com/User.Read",
+            key="entra_id_auth",
+        )
+
+        if result and "token" in result:
+            st.session_state["auth_token"] = result["token"]
+            st.rerun()
+
+    st.stop()
+
+
+# --- 2. AUTHENTICATED SIDEBAR & USER PROFILE ---
+token_data = st.session_state["auth_token"]
+id_token_str = token_data.get("id_token", "") if isinstance(token_data, dict) else ""
+user_claims = decode_jwt_payload(id_token_str)
+
+user_name = user_claims.get("name", "Authenticated User")
+user_email = user_claims.get("preferred_username", user_claims.get("email", "Entra ID Account"))
+
+with st.sidebar:
+    st.title("👤 Account Profile")
+    st.markdown(f"**{user_name}**")
+    st.caption(user_email)
+    st.success("Verified via Entra ID")
+    st.divider()
+
+    if st.button("🚪 Sign Out", use_container_width=True):
+        st.session_state["auth_token"] = None
+        st.rerun()
+
+
+# --- 3. SUPABASE DATA RETRIEVAL ---
 @st.cache_data(ttl=300)
 def load_supabase_predictions() -> pd.DataFrame:
-    """Return latest Supabase rows (one per ticker per date)."""
     client = get_supabase_client()
     if client is None:
         return pd.DataFrame()
@@ -58,287 +148,108 @@ def _parse_price_history(raw: object) -> list[float]:
     if isinstance(raw, str):
         try:
             decoded = json.loads(raw)
+            if isinstance(decoded, list):
+                return [float(value) for value in decoded]
         except json.JSONDecodeError:
             return []
-        if isinstance(decoded, list):
-            return [float(value) for value in decoded]
     return []
 
 
-def _latest_actual_price(row: pd.Series) -> float | None:
-    prices = row.get("actual_prices_last_month", [])
-    if prices:
-        return float(prices[-1])
-    return None
-
-
-def build_price_history(row: pd.Series) -> tuple[pd.DataFrame, pd.DataFrame] | None:
-    prices = row.get("actual_prices_last_month", [])
-    if not prices:
-        return None
-
-    as_of_date: date = row["as_of_date"]
-    n = len(prices)
-
-    actual_index = pd.bdate_range(end=pd.to_datetime(as_of_date), periods=n)
-    actual_df = pd.DataFrame({"date": actual_index, "price": prices})
-
-    prediction_date = pd.bdate_range(
-        start=pd.to_datetime(as_of_date) + pd.Timedelta(days=1),
-        periods=1,
-    )[0]
-    predicted_df = pd.DataFrame({"date": [prediction_date], "price": [row["predicted_price"]]})
-
-    return actual_df, predicted_df
-
-
-@lru_cache(maxsize=1)
-def compute_prediction_performance(data_json: str) -> pd.DataFrame:
-    """Compare past predictions against actual outcomes using successive days."""
-    df = pd.read_json(data_json, orient="records", convert_dates=False)
-    if df.empty:
-        return df
-
-    df["as_of_date"] = pd.to_datetime(df["as_of_date"]).dt.date
-    if "actual_prices_last_month" in df.columns:
-        df["actual_prices_last_month"] = df["actual_prices_last_month"].apply(_parse_price_history)
-    df = df.sort_values(["ticker", "as_of_date"])
-
-    records: list[dict[str, object]] = []
-
-    for ticker, group in df.groupby("ticker"):
-        group = group.reset_index(drop=True)
-        for idx in range(len(group) - 1):
-            current = group.loc[idx]
-
-            prices = current.get("actual_prices_last_month")
-            if not prices:
-                continue
-
-            next_row = group.loc[idx + 1]
-            actual_next_price = _latest_price_from_row(next_row)
-            if actual_next_price is None:
-                continue
-
-            records.append(
-                {
-                    "ticker": ticker,
-                    "prediction_date": current["as_of_date"],
-                    "evaluation_date": next_row["as_of_date"],
-                    "predicted_price": float(current["predicted_price"]),
-                    "actual_price": actual_next_price,
-                    "error": actual_next_price - float(current["predicted_price"]),
-                }
-            )
-
-    perf_df = pd.DataFrame(records)
-    if perf_df.empty:
-        return perf_df
-
-    perf_df["absolute_error"] = perf_df["error"].abs()
-    perf_df["error_pct"] = perf_df["error"] / perf_df["predicted_price"]
-    return perf_df
-
-
-def _latest_price_from_row(row: pd.Series) -> float | None:
-    prices = row.get("actual_prices_last_month")
-    if isinstance(prices, list) and prices:
-        return float(prices[-1])
-    return None
-
-
-def pie_chart(weights_df: pd.DataFrame):
-    chart_df = weights_df[["ticker", "portfolio_weight"]].copy()
-    chart_df["portfolio_weight"] = pd.to_numeric(chart_df["portfolio_weight"], errors="coerce")
-    chart_df = chart_df.dropna(subset=["portfolio_weight"])
-
-    total_weight = chart_df["portfolio_weight"].sum()
-    if total_weight <= 0:
-        return None
-
-    fig = px.pie(
-        chart_df,
-        names="ticker",
-        values="portfolio_weight",
-        hole=0.3,
-    )
-    fig.update_traces(textinfo="label+percent", hovertemplate="%{label}: %{value:.2f}")
-    fig.update_layout(showlegend=True, legend_title_text="Ticker", height=360)
-    return fig
-
-
+# --- 4. MAIN DASHBOARD ---
 def run_dashboard() -> None:
-    st.title("📊 Portfolio Forecast Dashboard")
-    st.caption(
-        "Latest Prophet predictions, portfolio weights, and performance analysis sourced from Supabase."
-    )
+    st.title("📈 Indian Stock Market Portfolio Allocator")
+    st.caption("Meta Prophet Price Predictions & Markowitz Mean-Variance Portfolio Optimisation (NSE)")
 
     df = load_supabase_predictions()
     if df.empty:
-        st.info("No prediction data available. Run the optimisation pipeline to populate Supabase.")
+        st.warning("No prediction data found in Supabase. Run 'python -m src.main' to populate initial data.")
         return
 
     available_dates = sorted(df["as_of_date"].unique(), reverse=True)
-    selected_date = st.selectbox(
-        "Select as-of date", options=available_dates, format_func=lambda d: d.strftime("%Y-%m-%d")
+    
+    # Date Selection Filter
+    st.sidebar.divider()
+    st.sidebar.subheader("📅 Model Execution Date")
+    selected_date = st.sidebar.selectbox(
+        "Select Run Date", options=available_dates, format_func=lambda d: d.strftime("%B %d, %Y")
     )
 
-    date_df = df[df["as_of_date"] == selected_date].copy().sort_values("ticker")
+    date_df = df[df["as_of_date"] == selected_date].copy().sort_values("portfolio_weight", ascending=False)
 
-    # Precompute prediction performance dataframe for all tickers
-    perf_df = compute_prediction_performance(df.to_json(orient="records", date_format="iso"))
+    # Calculate Summary KPI Metrics
+    weighted_return = (date_df["predicted_return"] * date_df["portfolio_weight"]).sum() * 100
+    top_holding = date_df.iloc[0]
+    top_ticker = top_holding["ticker"]
+    top_weight = top_holding["portfolio_weight"] * 100
 
-    st.subheader("Portfolio Weights DEMO")
-    weight_col, table_col = st.columns([1, 1])
-    with weight_col:
-        pie = pie_chart(date_df)
-        if pie is None:
-            st.info("Weights are zero or missing for this date.")
-        else:
-            st.plotly_chart(pie, use_container_width=True)
+    # Top KPI Display Cards
+    kpi1, kpi2, kpi3 = st.columns(3)
+    kpi1.metric("Weighted Expected Return", f"{weighted_return:.2f}%", delta=f"{weighted_return:.2f}%")
+    kpi2.metric("Top Asset Allocation", f"{top_ticker}", delta=f"{top_weight:.1f}% weight")
+    kpi3.metric("Assets Analyzed", f"{len(date_df)} Tickers")
 
-    with table_col:
-        summary_table = date_df[["ticker", "predicted_price", "predicted_return"]].copy()
-        summary_table["predicted_return_pct"] = summary_table["predicted_return"] * 100
-        summary_table = summary_table.rename(
-            columns={
-                "ticker": "Ticker",
-                "predicted_price": "Predicted Price",
-                "predicted_return_pct": "Predicted Return (%)",
-            }
+    st.divider()
+
+    # Asset Allocation Visualizations
+    st.subheader("Optimal Portfolio Allocations")
+    col_chart, col_table = st.columns([1.2, 1])
+
+    with col_chart:
+        fig = px.pie(
+            date_df,
+            names="ticker",
+            values="portfolio_weight",
+            hole=0.45,
+            color_discrete_sequence=px.colors.qualitative.Bold,
         )
+        fig.update_traces(
+            textinfo="label+percent", 
+            hovertemplate="<b>%{label}</b><br>Allocation: %{value:.2%}"
+        )
+        fig.update_layout(
+            height=400, 
+            margin=dict(l=10, r=10, t=10, b=10),
+            showlegend=False
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+    with col_table:
+        table_df = date_df[["ticker", "predicted_price", "predicted_return", "portfolio_weight"]].copy()
+        table_df["predicted_return"] = table_df["predicted_return"] * 100
+        table_df["portfolio_weight"] = table_df["portfolio_weight"] * 100
+        table_df.columns = ["Ticker", "Predicted Price", "Expected Return", "Allocation"]
+
         st.dataframe(
-            summary_table[["Ticker", "Predicted Price", "Predicted Return (%)"]],
+            table_df,
             hide_index=True,
             use_container_width=True,
             column_config={
-                "Predicted Price": st.column_config.NumberColumn(format="$%.2f"),
-                "Predicted Return (%)": st.column_config.NumberColumn(format="%.2f%%"),
+                "Predicted Price": st.column_config.NumberColumn(format="₹%.2f"),
+                "Expected Return": st.column_config.NumberColumn(format="%.2f%%"),
+                "Allocation": st.column_config.NumberColumn(format="%.2f%%"),
             },
         )
 
-    tickers = date_df["ticker"].tolist()
-    selected_ticker = st.selectbox("Select ticker for detail view", options=tickers, index=0)
+    # Historical Price Trends Expander
+    with st.expander("📊 View Historical Price Trends (Last Month)", expanded=False):
+        selected_ticker = st.selectbox("Select Ticker for Historical Analysis", options=date_df["ticker"].unique())
+        ticker_row = date_df[date_df["ticker"] == selected_ticker].iloc[0]
+        prices = ticker_row.get("actual_prices_last_month", [])
 
-    ticker_row = date_df.set_index("ticker").loc[selected_ticker]
-    latest_actual = _latest_actual_price(ticker_row)
-
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric(
-            "Latest Actual Price", f"${latest_actual:.2f}" if latest_actual is not None else "—"
-        )
-    with col2:
-        st.metric("Predicted Price", f"${ticker_row['predicted_price']:.2f}")
-    with col3:
-        st.metric("Predicted Return", f"{ticker_row['predicted_return']*100:.2f}%")
-
-    st.subheader(f"Price Trend · {selected_ticker}")
-    ticker_perf_for_trend = perf_df[perf_df["ticker"] == selected_ticker].copy()
-    if ticker_perf_for_trend.empty:
-        st.info("No historical prediction data available for this ticker yet.")
-    else:
-        # Determine dynamic y-axis range: -20% below min and +20% above max
-        min_price = float(ticker_perf_for_trend[["actual_price", "predicted_price"]].min().min())
-        max_price = float(ticker_perf_for_trend[["actual_price", "predicted_price"]].max().max())
-
-        default_min = min_price * 0.8
-        default_max = max_price * 1.2
-
-        # Allow some extra room in the slider bounds
-        slider_min = float(round(default_min * 0.9, 2))
-        slider_max = float(round(default_max * 1.1, 2))
-
-        y_min, y_max = st.slider(
-            "Price range (y-axis)",
-            min_value=slider_min,
-            max_value=slider_max,
-            value=(float(round(default_min, 2)), float(round(default_max, 2))),
-        )
-
-        long_df_trend = ticker_perf_for_trend.melt(
-            id_vars=["evaluation_date", "prediction_date"],
-            value_vars=["actual_price", "predicted_price"],
-            var_name="series",
-            value_name="price",
-        )
-        line_chart_trend = (
-            alt.Chart(long_df_trend)
-            .mark_line(point=True)
-            .encode(
-                x=alt.X("evaluation_date:T", title="Evaluation Date"),
-                y=alt.Y("price:Q", title="Price (USD)", scale=alt.Scale(domain=[y_min, y_max])),
-                color=alt.Color(
-                    "series:N",
-                    title="Series",
-                    scale=alt.Scale(
-                        domain=["actual_price", "predicted_price"],
-                        range=["#1f77b4", "#ff7f0e"],
-                    ),
-                    legend=alt.Legend(
-                        labelExpr="datum.value == 'actual_price' ? 'Actual' : 'Predicted'"
-                    ),
-                ),
-                tooltip=[
-                    alt.Tooltip("prediction_date:T", title="Prediction Date"),
-                    alt.Tooltip("evaluation_date:T", title="Evaluation Date"),
-                    alt.Tooltip("series:N", title="Series"),
-                    alt.Tooltip("price:Q", title="Price", format=".2f"),
-                ],
+        if prices:
+            history_fig = go.Figure()
+            history_fig.add_trace(go.Scatter(y=prices, mode="lines+markers", name=selected_ticker, line=dict(color="#1f77b4", width=2)))
+            history_fig.update_layout(
+                title=f"30-Day Historical Closing Prices — {selected_ticker}",
+                yaxis_title="Price (INR)",
+                xaxis_title="Trading Days",
+                height=320,
+                margin=dict(l=20, r=20, t=40, b=20),
             )
-        )
-        st.altair_chart(line_chart_trend, use_container_width=True)
-        st.caption("Lines show historical predicted vs actual next-day prices for this ticker.")
-
-    st.subheader("Prediction Accuracy")
-    if perf_df.empty:
-        st.info(
-            "Not enough historical runs to evaluate predictions yet. Check back after multiple runs."
-        )
-    else:
-        ticker_perf = perf_df[perf_df["ticker"] == selected_ticker].copy()
-        if ticker_perf.empty:
-            st.info("No historical prediction data for this ticker yet.")
+            st.plotly_chart(history_fig, use_container_width=True)
         else:
-            ticker_perf["error_pct"] = ticker_perf["error_pct"] * 100
-            ticker_perf_display = ticker_perf.rename(
-                columns={
-                    "prediction_date": "Prediction Date",
-                    "evaluation_date": "Evaluation Date",
-                    "predicted_price": "Predicted Price",
-                    "actual_price": "Actual Price",
-                    "error": "Error",
-                    "absolute_error": "Absolute Error",
-                    "error_pct": "Error (%)",
-                }
-            )
-            st.dataframe(
-                ticker_perf_display[
-                    [
-                        "Prediction Date",
-                        "Evaluation Date",
-                        "Predicted Price",
-                        "Actual Price",
-                        "Error",
-                        "Absolute Error",
-                        "Error (%)",
-                    ]
-                ],
-                hide_index=True,
-                use_container_width=True,
-                column_config={
-                    "Predicted Price": st.column_config.NumberColumn(format="$%.2f"),
-                    "Actual Price": st.column_config.NumberColumn(format="$%.2f"),
-                    "Error": st.column_config.NumberColumn(format="$%.2f"),
-                    "Absolute Error": st.column_config.NumberColumn(format="$%.2f"),
-                    "Error (%)": st.column_config.NumberColumn(format="%.2f%%"),
-                },
-            )
-
-
-def main() -> None:
-    run_dashboard()
+            st.info("No historical price array found for this asset.")
 
 
 if __name__ == "__main__":
-    main()
+    run_dashboard()

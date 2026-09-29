@@ -1,4 +1,4 @@
-"""Data processing module for aligning, normalizing, and manipulating stock data."""
+"""Data processing module for aligning and prepping stock time series."""
 
 import logging
 from datetime import timedelta
@@ -9,34 +9,24 @@ logger = logging.getLogger(__name__)
 
 
 def preprocess_data(all_stock_data: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
-    """
-    Align multiple tickers by common dates while keeping them as a dictionary of DataFrames.
-
-    Args:
-        all_stock_data: Dictionary mapping ticker to DataFrame with date index
-
-    Returns:
-        Dictionary of DataFrames where all tickers share the same index (common dates)
-    """
+    """Align multiple tickers by common trading dates."""
     if not all_stock_data:
         return {}
 
-    # Ensure all indexes are datetime.date type and find intersection of dates across all tickers
-    normalised_all_stock_data = {}
+    normalised_data = {}
     for ticker, df in all_stock_data.items():
         df_copy = df.copy()
         df_copy.index = pd.to_datetime(df_copy.index).date
-        normalised_all_stock_data[ticker] = df_copy
+        normalised_data[ticker] = df_copy
 
-    # Find common dates across all tickers
-    date_sets = [set(df.index) for df in normalised_all_stock_data.values()]
+    # Find date intersection across all active tickers
+    date_sets = [set(df.index) for df in normalised_data.values()]
     common_dates = sorted(set.intersection(*date_sets))
 
-    # Trim each DataFrame to the common dates
-    aligned_all_stock_data = {
-        ticker: df.loc[common_dates] for ticker, df in normalised_all_stock_data.items()
+    aligned_data = {
+        ticker: df.loc[common_dates] for ticker, df in normalised_data.items()
     }
-    return aligned_all_stock_data
+    return aligned_data
 
 
 def append_predictions(
@@ -44,32 +34,21 @@ def append_predictions(
     predictions: dict[str, float],
     predicted_returns: dict[str, float],
 ) -> dict[str, pd.DataFrame]:
-    """
-    Append predicted price and return to each ticker's DataFrame.
-
-    Args:
-        portfolio_data: Dictionary of historical DataFrames per ticker
-        predictions: Dictionary of predicted prices per ticker
-        predicted_returns: Dictionary of predicted returns per ticker
-
-    Returns:
-        Updated dictionary with an additional row for each ticker
-    """
+    """Append the Prophet predicted next-day price and return row to each ticker."""
     updated_portfolio_data = {}
 
     for ticker, df in portfolio_data.items():
         df_copy = df.copy()
+        last_date = pd.to_datetime(df_copy.index[-1])
 
-        last_date = df_copy.index[-1]
-        prediction_date = last_date + timedelta(days=1)
+        # Get next business day
+        prediction_date = pd.bdate_range(start=last_date + timedelta(days=1), periods=1)[0].date()
 
-        # Create and append prediction row
         new_row = pd.DataFrame(
             {"Price": [predictions[ticker]], "Returns": [predicted_returns[ticker]]},
             index=[prediction_date],
         )
         df_copy = pd.concat([df_copy, new_row])
-
         updated_portfolio_data[ticker] = df_copy
 
     return updated_portfolio_data
@@ -79,16 +58,7 @@ def collect_recent_prices(
     portfolio_data: dict[str, pd.DataFrame],
     days: int = 30,
 ) -> dict[str, list[float]]:
-    """
-    Collect the most recent prices for each ticker over the given trailing window.
-
-    Args:
-        portfolio_data: Dictionary of historical DataFrames per ticker.
-        days: Number of trailing days (inclusive) to include. Defaults to 30.
-
-    Returns:
-        Dictionary mapping ticker to a list of recent price floats ordered by date.
-    """
+    """Collect trailing historical prices for visual display in Streamlit."""
     recent_prices: dict[str, list[float]] = {}
 
     for ticker, df in portfolio_data.items():

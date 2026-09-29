@@ -1,4 +1,4 @@
-"""Database operations for saving optimisation results to Supabase."""
+"""Database operations for saving Indian stock optimisation results to Supabase."""
 
 from __future__ import annotations
 
@@ -17,17 +17,12 @@ logger = logging.getLogger(__name__)
 
 
 def get_supabase_client() -> Client | None:
-    """
-    Create and return Supabase client from environment variables.
-
-    Returns:
-        Supabase client if credentials are available, None otherwise
-    """
+    """Create and return Supabase client from environment variables."""
     url = os.environ.get("SUPABASE_URL")
     key = os.environ.get("SUPABASE_KEY")
 
     if not url or not key:
-        logger.warning("Supabase credentials not found in environment variables")
+        logger.warning("Supabase credentials (SUPABASE_URL / SUPABASE_KEY) not found in environment")
         return None
 
     return create_client(url, key)
@@ -35,14 +30,10 @@ def get_supabase_client() -> Client | None:
 
 def save_results_to_supabase(result: dict[str, Any]) -> None:
     """
-    Save optimisation results to Supabase database.
+    Save NSE stock optimisation results to Supabase database.
 
     Args:
         result: Dictionary containing optimisation results from run_optimisation()
-            Expected keys: predictions, predicted_returns, weights
-
-    Raises:
-        ValueError: If Supabase client cannot be created or insertion fails
     """
     supabase = get_supabase_client()
     if supabase is None:
@@ -57,10 +48,9 @@ def save_results_to_supabase(result: dict[str, Any]) -> None:
     actual_prices_last_month = result.get("actual_prices_last_month", {})
 
     if not predictions:
-        logger.warning("No predictions to save")
+        logger.warning("No predictions available to save.")
         return
 
-    # Prepare rows for insertion - one row per stock
     rows = []
     for ticker in predictions.keys():
         row = {
@@ -75,7 +65,6 @@ def save_results_to_supabase(result: dict[str, Any]) -> None:
         }
         rows.append(row)
 
-    logger.info(f"Inserting {len(rows)} rows into Supabase...")
-    (supabase.table(SUPABASE_TABLE_NAME).insert(rows).execute())
-
-    logger.info(f"Successfully saved {len(rows)} predictions to Supabase")
+    logger.info(f"Inserting {len(rows)} records into Supabase table '{SUPABASE_TABLE_NAME}'...")
+    supabase.table(SUPABASE_TABLE_NAME).insert(rows).execute()
+    logger.info(f"Successfully saved {len(rows)} ticker predictions to Supabase.")

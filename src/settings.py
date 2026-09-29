@@ -1,48 +1,44 @@
-"""Settings and constants for portfolio optimisation."""
+"""Settings and constants for portfolio optimisation (Indian Stock Market)."""
 from datetime import datetime
 
 # Risk parameters
 MINIMUM_ALLOCATION = 0.05  # Minimum allocation per asset (5%)
-MAXIMUM_ALLOCATION = 1
-RISK_AVERSION = 5
+MAXIMUM_ALLOCATION = 1.0
+RISK_AVERSION = 5.0
 
 # Date defaults
-START_DATE = "2024-01-01"  # Default start date for historical data
+START_DATE = "2024-01-01"
 END_DATE = datetime.now().strftime("%Y-%m-%d")
 
-# Stock Allocation
+# Indian Stock Tickers (National Stock Exchange - NSE)
 PORTFOLIO_TICKERS = [
-    "AMD",
-    "MSFT",
-    "AAPL",
-    "TSLA",
-    "AMZN",
-    "NVDA",
-    "META",
-    "GOOG",
-    "TSM",
-    "JPM",
-    "NFLX",
-    "PLTR",
+    "RELIANCE.NS",
+    "TCS.NS",
+    "HDFCBANK.NS",
+    "INFY.NS",
+    "ICICIBANK.NS",
+    "BHARTIARTL.NS",
+    "ITC.NS",
+    "SBIN.NS",
+    "LT.NS",          
+    "WIPRO.NS",   
 ]
 
 # Database
 SUPABASE_TABLE_NAME = "stock_optimisation_store"
 
+# Exchange calendar code for NSE in pandas_market_calendars
+EXCHANGE_CALENDAR = "NSE"
+
 # Holiday name mapping for Prophet model
 HOLIDAY_NAME_MAP = {
-    "New Year's Day": "new_years",
-    "Dr. Martin Luther King Jr. Day": "mlk_day",
+    "Republic Day": "republic_day",
+    "Independence Day": "independence_day",
+    "Mahatma Gandhi Jayanti": "gandhi_jayanti",
+    "Diwali": "diwali",
+    "Holi": "holi",
     "Good Friday": "good_friday",
-    "Memorial Day": "memorial_day",
-    "July 4th": "independence_day",
-    "Labor Day": "labor_day",
-    "Thanksgiving": "thanksgiving",
-    "Election Day": "election_day",
-    "Veteran Day": "veterans_day",
-    "Columbus Day": "columbus_day",
     "Christmas": "christmas",
-    "Christmas Day": "christmas",
 }
 
 # Prophet model parameters
