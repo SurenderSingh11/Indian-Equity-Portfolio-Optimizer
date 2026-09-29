@@ -1,11 +1,11 @@
 """Tests for data module."""
 
-import pytest
-import pandas as pd
-import numpy as np
 from datetime import date, timedelta
 
-from src.data import extract_data, preprocess_data, append_predictions
+import numpy as np
+import pandas as pd
+
+from src.data import append_predictions, extract_data, preprocess_data
 
 
 class TestData:

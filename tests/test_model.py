@@ -1,8 +1,7 @@
 """Tests for Prophet model module."""
 
-import pytest
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 from src.model import ProphetModel
 
@@ -58,7 +57,6 @@ class TestProphetModel:
 
     def test_predict_for_tickers(self) -> None:
         """Test predict_for_tickers method with multiple tickers."""
-        from datetime import date
 
         dates = pd.date_range("2024-01-01", periods=100, freq="D")
 

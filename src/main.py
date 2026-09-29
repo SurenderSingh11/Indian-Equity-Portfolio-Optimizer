@@ -1,13 +1,13 @@
 """Main entry point for portfolio optimization."""
 
-from typing import Dict, Optional, List
 import logging
+
 import pandas as pd
 
-from src.data import extract_data, preprocess_data, append_predictions
+from src.data import append_predictions, extract_data, preprocess_data
 from src.model import ProphetModel
 from src.optimizer import optimize_portfolio_mean_variance
-from src.settings import START_DATE, END_DATE, MINIMUM_ALLOCATION
+from src.settings import END_DATE, MINIMUM_ALLOCATION, START_DATE
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -15,11 +15,11 @@ logger = logging.getLogger(__name__)
 
 
 def run_optimization(
-    tickers: List[str],
+    tickers: list[str],
     start_date: str = START_DATE,
     end_date: str = END_DATE,
-    minimum_allocation: Optional[float] = None,
-) -> Dict:
+    minimum_allocation: float | None = None,
+) -> dict:
     """
     Run portfolio optimization: pull data, predict, calculate allocation, and log result.
 

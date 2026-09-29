@@ -1,8 +1,8 @@
 """Prophet model for one-step forward prediction."""
 
-from typing import Optional, Dict, Tuple
-import pandas as pd
 import logging
+
+import pandas as pd
 from prophet import Prophet
 
 logger = logging.getLogger(__name__)
@@ -11,9 +11,9 @@ logger = logging.getLogger(__name__)
 class ProphetModel:
     """Prophet model for forecasting stock prices."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize Prophet model."""
-        self.model: Optional[Prophet] = None
+        self.model: Prophet | None = None
 
     def fit(self, price_series: pd.Series) -> "ProphetModel":
         """
@@ -54,14 +54,16 @@ class ProphetModel:
         future = pd.DataFrame({"ds": pd.date_range(start=last_date, periods=2, freq="D")[1:]})
 
         # Make prediction
+        if self.model is None:
+            raise RuntimeError("Model not fitted")
         forecast = self.model.predict(future)
 
         return float(forecast["yhat"].iloc[0])
 
     def predict_for_tickers(
         self,
-        portfolio_data: Dict[str, pd.DataFrame],
-    ) -> Tuple[Dict[str, float], Dict[str, float]]:
+        portfolio_data: dict[str, pd.DataFrame],
+    ) -> tuple[dict[str, float], dict[str, float]]:
         """
         Predict prices and returns for multiple tickers.
 
@@ -71,8 +73,8 @@ class ProphetModel:
         Returns:
             Tuple of (predictions, predicted_returns) dictionaries
         """
-        predictions: Dict[str, float] = {}
-        predicted_returns: Dict[str, float] = {}
+        predictions: dict[str, float] = {}
+        predicted_returns: dict[str, float] = {}
 
         for ticker in portfolio_data.keys():
             # Get stock data

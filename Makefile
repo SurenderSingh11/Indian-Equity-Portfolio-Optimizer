@@ -21,11 +21,11 @@ format: ## Format code with black
 
 lint: ## Lint code with ruff
 	poetry run ruff check src tests
-	poetry run ruff format --check src tests
+	poetry run black --check src tests
 
 lint-fix: ## Auto-fix linting issues
 	poetry run ruff check --fix src tests
-	poetry run ruff format src tests
+	poetry run black src tests
 
 type-check: ## Run type checking with mypy
 	poetry run mypy src

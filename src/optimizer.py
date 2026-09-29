@@ -1,4 +1,3 @@
-from typing import Dict
 import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
@@ -6,7 +5,7 @@ from scipy.optimize import minimize
 from src.settings import MINIMUM_ALLOCATION, RISK_AVERSION
 
 
-def calculate_mean_variance(data_dict: Dict[str, pd.DataFrame]):
+def calculate_mean_variance(data_dict: dict[str, pd.DataFrame]):
     """Calculate mean returns and covariance matrix from Returns columns."""
     returns_df = pd.DataFrame({ticker: df["Returns"] for ticker, df in data_dict.items()})
     mean_returns = returns_df.mean()
@@ -15,7 +14,7 @@ def calculate_mean_variance(data_dict: Dict[str, pd.DataFrame]):
 
 
 def optimize_portfolio_mean_variance(
-    data_dict: Dict[str, pd.DataFrame],
+    data_dict: dict[str, pd.DataFrame],
     minimum_allocation: float = MINIMUM_ALLOCATION,
     risk_aversion: float = RISK_AVERSION,
 ) -> pd.Series:
@@ -37,8 +36,8 @@ def optimize_portfolio_mean_variance(
     # Objective: maximize return - (lambda/2) * variance
     # minimize negative of it
     def objective(weights: np.ndarray) -> float:
-        port_return = np.dot(weights, mu)
-        port_var = np.dot(weights.T, np.dot(cov, weights))
+        port_return = float(np.dot(weights, mu))
+        port_var = float(np.dot(weights.T, np.dot(cov, weights)))
         return -(port_return - 0.5 * risk_aversion * port_var)
 
     # Constraint: sum(weights) == 1

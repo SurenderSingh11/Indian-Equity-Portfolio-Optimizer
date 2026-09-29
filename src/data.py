@@ -1,11 +1,11 @@
 """Data extraction and preprocessing."""
-from datetime import timedelta, date
-from typing import Dict, List, Optional
 import logging
+from datetime import date, timedelta
+
 import pandas as pd
 import yfinance as yf
 
-from .settings import START_DATE, END_DATE
+from .settings import END_DATE, START_DATE
 
 logger = logging.getLogger(__name__)
 
@@ -34,9 +34,7 @@ def _process_ticker_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def _extract_single_ticker_data(
-    ticker: str, start_date: str, end_date: str
-) -> Optional[pd.DataFrame]:
+def _extract_single_ticker_data(ticker: str, start_date: str, end_date: str) -> pd.DataFrame | None:
     """
     Extract and process data for a single ticker.
 
@@ -64,10 +62,10 @@ def _extract_single_ticker_data(
 
 
 def extract_data(
-    tickers: List[str],
+    tickers: list[str],
     start_date: str = START_DATE,
     end_date: str = END_DATE,
-) -> Dict[str, pd.DataFrame]:
+) -> dict[str, pd.DataFrame]:
     """
     Extract historical stock data for multiple tickers.
 
@@ -79,7 +77,7 @@ def extract_data(
     Returns:
         Dictionary mapping ticker to DataFrame with columns ['Price', 'Returns']
     """
-    data_dict: Dict[str, pd.DataFrame] = {}
+    data_dict: dict[str, pd.DataFrame] = {}
 
     for ticker in tickers:
         processed_df = _extract_single_ticker_data(ticker, start_date, end_date)
@@ -104,7 +102,7 @@ def _normalize_date_index(df: pd.DataFrame) -> pd.DataFrame:
     return df_copy
 
 
-def _find_common_dates(data_dict: Dict[str, pd.DataFrame]) -> List[date]:
+def _find_common_dates(data_dict: dict[str, pd.DataFrame]) -> list[date]:
     """
     Find common dates across all tickers in the data dictionary.
 
@@ -122,7 +120,7 @@ def _find_common_dates(data_dict: Dict[str, pd.DataFrame]) -> List[date]:
     return sorted(common_dates)
 
 
-def preprocess_data(data_dict: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
+def preprocess_data(data_dict: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     """
     Align multiple tickers by common dates while keeping them as a dictionary of DataFrames.
 
@@ -178,10 +176,10 @@ def _create_prediction_row(price: float, returns: float, prediction_date: date) 
 
 
 def append_predictions(
-    portfolio_data: Dict[str, pd.DataFrame],
-    predictions: Dict[str, float],
-    predicted_returns: Dict[str, float],
-) -> Dict[str, pd.DataFrame]:
+    portfolio_data: dict[str, pd.DataFrame],
+    predictions: dict[str, float],
+    predicted_returns: dict[str, float],
+) -> dict[str, pd.DataFrame]:
     """
     Append predicted price and return to each ticker's DataFrame.
 
