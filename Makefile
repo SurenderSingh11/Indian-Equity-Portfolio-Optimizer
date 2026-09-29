@@ -65,8 +65,8 @@ ci: lint type-check test-cov ## Run CI pipeline checks
 shell: ## Open poetry shell
 	poetry shell
 
-run: ## Run the main script (to be defined)
-	@echo "Main script not yet defined"
+run: ## Run the main script
+	poetry run python -m src.main
 
 .DEFAULT_GOAL := help
 

@@ -42,48 +42,16 @@ jobs:
 
       - name: Run portfolio optimisation and save results
         run: |
-          poetry run python << 'EOF' || true
-          import json
-          import sys
-          import os
-          from datetime import date
-          from src.main import run_optimisation
-          
-          try:
-              # Get today's date
-              today = date.today().isoformat()
-              
-              # Run optimisation
-              result = run_optimisation(tickers=["KO", "BBVA", "REP.MC", "MSFT", "AAPL"])
-              
-              # Ensure results directory exists
-              os.makedirs('results', exist_ok=True)
-              
-              # Print summary to text file
-              with open(f'results/optimisation-{today}.txt', 'w') as txt_file:
-                  txt_file.write("\n" + "=" * 70 + "\n")
-                  txt_file.write("Portfolio Optimisation Complete\n")
-                  txt_file.write("=" * 70 + "\n")
-                  txt_file.write(f"Date: {result.get('date', 'N/A')}\n")
-                  txt_file.write(f"Weights: {result.get('weights', {})}\n")
-              
-              # Convert date to ISO string for JSON serialization
-              if 'date' in result and hasattr(result['date'], 'isoformat'):
-                  result_copy = result.copy()
-                  result_copy['date'] = result['date'].isoformat()
-              else:
-                  result_copy = result
-              
-              # Save JSON file
-              with open(f'results/optimisation-{today}.json', 'w') as json_file:
-                  json.dump(result_copy, json_file, indent=2, default=str)
-          except Exception as e:
-              print(f"Error during optimisation: {e}", file=sys.stderr)
-              import traceback
-              traceback.print_exc()
-              sys.exit(1)
-          EOF
+          poetry run python -m src.main --save-to-files || true
         continue-on-error: true
+
+      - name: Upload results as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: optimisation-results-${{ github.run_number }}
+          path: results/
+          retention-days: 90
 
       - name: Display results
         if: always()
@@ -97,4 +65,3 @@ jobs:
           else
             echo "No results file found" >> $GITHUB_STEP_SUMMARY
           fi
-

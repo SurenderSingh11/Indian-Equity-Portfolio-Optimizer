@@ -1,5 +1,7 @@
 """Prophet model for one-step forward prediction."""
 
+from __future__ import annotations
+
 import logging
 
 import pandas as pd
@@ -12,10 +14,10 @@ class ProphetModel:
     """Prophet model for forecasting stock prices."""
 
     def __init__(self) -> None:
-        """Initialize Prophet model."""
+        """Initialise Prophet model."""
         self.model: Prophet | None = None
 
-    def fit(self, price_series: pd.Series) -> "ProphetModel":
+    def fit(self, price_series: pd.Series) -> ProphetModel:
         """
         Fit Prophet model to price series.
 
@@ -23,12 +25,12 @@ class ProphetModel:
             price_series: Historical price series with datetime index
 
         Returns:
-            Self for method chaining
+            Self (ProphetModel instance) for method chaining
         """
         # Prepare data for Prophet (requires 'ds' and 'y' columns)
         df = pd.DataFrame({"ds": price_series.index, "y": price_series.values})
 
-        # Initialize and fit model
+        # Initialise and fit model
         self.model = Prophet()
         self.model.fit(df)
 
@@ -68,10 +70,12 @@ class ProphetModel:
         Predict prices and returns for multiple tickers.
 
         Args:
-            portfolio_data: Dictionary mapping ticker to DataFrame with price columns
+            portfolio_data: Dictionary mapping ticker to DataFrame with 'Price' column
 
         Returns:
-            Tuple of (predictions, predicted_returns) dictionaries
+            Tuple containing:
+            - predictions: dict[str, float] mapping ticker to predicted price
+            - predicted_returns: dict[str, float] mapping ticker to predicted return
         """
         predictions: dict[str, float] = {}
         predicted_returns: dict[str, float] = {}

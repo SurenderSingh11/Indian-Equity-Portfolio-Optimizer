@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 def _process_ticker_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Process raw ticker DataFrame: extract price, calculate returns, normalize dates.
+    Process raw ticker DataFrame: extract price, calculate returns, normalise dates.
 
     Args:
         df: Raw DataFrame from yfinance with date index and 'Close' column
@@ -89,13 +89,13 @@ def extract_data(
 
 def _normalize_date_index(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Normalize DataFrame index to datetime.date type.
+    Normalise DataFrame index to datetime.date type.
 
     Args:
         df: DataFrame with date-like index
 
     Returns:
-        DataFrame with normalized date index
+        DataFrame with normalised date index
     """
     df_copy = df.copy()
     df_copy.index = pd.to_datetime(df_copy.index).date

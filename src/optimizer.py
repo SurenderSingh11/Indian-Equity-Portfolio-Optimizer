@@ -5,8 +5,22 @@ from scipy.optimize import minimize
 from src.settings import MINIMUM_ALLOCATION, RISK_AVERSION
 
 
-def calculate_mean_variance(data_dict: dict[str, pd.DataFrame]):
-    """Calculate mean returns and covariance matrix from Returns columns."""
+def calculate_mean_variance(
+    data_dict: dict[str, pd.DataFrame],
+) -> tuple[pd.Series, pd.DataFrame]:
+    """
+    Calculate mean returns and covariance matrix from Returns columns.
+
+    Args:
+        data_dict: Dictionary where each key is a ticker symbol and each value
+            is a DataFrame containing at least a "Returns" column representing
+            periodic returns for that asset.
+
+    Returns:
+        Tuple containing:
+        - mean_returns: pd.Series of mean returns for each ticker, indexed by ticker
+        - cov_matrix: pd.DataFrame covariance matrix of returns across all tickers
+    """
     returns_df = pd.DataFrame({ticker: df["Returns"] for ticker, df in data_dict.items()})
     mean_returns = returns_df.mean()
     cov_matrix = returns_df.cov()
@@ -19,22 +33,25 @@ def optimize_portfolio_mean_variance(
     risk_aversion: float = RISK_AVERSION,
 ) -> pd.Series:
     """
-    Optimize portfolio using mean-variance (maximize return - risk_penalty).
+    Optimise portfolio using mean-variance (maximise return - risk_penalty).
 
     Args:
         data_dict: Dictionary of DataFrames with 'Returns' column
-        minimum_allocation: Minimum allocation for each asset
-        risk_aversion: Risk-aversion coefficient (lambda)
+        minimum_allocation: Minimum allocation for each asset (default: MINIMUM_ALLOCATION)
+        risk_aversion: Risk-aversion coefficient (lambda) (default: RISK_AVERSION)
 
     Returns:
-        pd.Series of optimal weights indexed by ticker
+        pd.Series of optimal weights indexed by ticker, where weights sum to 1.0
+
+    Raises:
+        ValueError: If optimisation fails
     """
     mu, cov = calculate_mean_variance(data_dict)
     tickers = list(data_dict.keys())
     num_assets = len(tickers)
 
-    # Objective: maximize return - (lambda/2) * variance
-    # minimize negative of it
+    # Objective: maximise return - (lambda/2) * variance
+    # minimise negative of it
     def objective(weights: np.ndarray) -> float:
         port_return = float(np.dot(weights, mu))
         port_var = float(np.dot(weights.T, np.dot(cov, weights)))
