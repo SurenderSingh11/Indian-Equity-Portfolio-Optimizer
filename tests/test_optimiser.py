@@ -3,7 +3,7 @@
 import numpy as np
 import pandas as pd
 
-from src.optimizer import (
+from src.optimiser import (
     calculate_mean_variance,
     optimize_portfolio_mean_variance,
 )

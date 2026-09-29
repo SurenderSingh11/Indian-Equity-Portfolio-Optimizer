@@ -208,3 +208,32 @@ def append_predictions(
         updated_dict[ticker] = df_copy
 
     return updated_dict
+
+
+def collect_recent_prices(
+    portfolio_data: dict[str, pd.DataFrame],
+    days: int = 30,
+) -> dict[str, list[float]]:
+    """
+    Collect the most recent prices for each ticker over the given trailing window.
+
+    Args:
+        portfolio_data: Dictionary of historical DataFrames per ticker.
+        days: Number of trailing days (inclusive) to include. Defaults to 30.
+
+    Returns:
+        Dictionary mapping ticker to a list of recent price floats ordered by date.
+    """
+    recent_prices: dict[str, list[float]] = {}
+
+    for ticker, df in portfolio_data.items():
+        if df.empty:
+            recent_prices[ticker] = []
+            continue
+
+        last_date = df.index[-1]
+        cutoff = last_date - timedelta(days=days)
+        recent_series = df.loc[df.index >= cutoff, "Price"]
+        recent_prices[ticker] = [float(value) for value in recent_series.tolist()]
+
+    return recent_prices

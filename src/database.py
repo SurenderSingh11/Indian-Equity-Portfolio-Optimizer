@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import uuid
@@ -49,9 +50,11 @@ def save_results_to_supabase(result: dict[str, Any]) -> None:
             "Supabase client not available. Check SUPABASE_URL and SUPABASE_KEY environment variables."
         )
 
+    as_of_date = result.get("date")
     predictions = result.get("predictions", {})
     predicted_returns = result.get("predicted_returns", {})
     weights = result.get("weights", {})
+    actual_prices_last_month = result.get("actual_prices_last_month", {})
 
     if not predictions:
         logger.warning("No predictions to save")
@@ -63,9 +66,11 @@ def save_results_to_supabase(result: dict[str, Any]) -> None:
         row = {
             "id": str(uuid.uuid4()),
             "created_at": datetime.now().isoformat(),
-            "stock": ticker,
-            "price_prediction": float(predictions.get(ticker, 0.0)),
-            "return_prediction": float(predicted_returns.get(ticker, 0.0)),
+            "as_of_date": as_of_date.isoformat() if as_of_date else None,
+            "ticker": ticker,
+            "predicted_price": float(predictions.get(ticker, 0.0)),
+            "predicted_return": float(predicted_returns.get(ticker, 0.0)),
+            "actual_prices_last_month": json.dumps(actual_prices_last_month.get(ticker, [])),
             "portfolio_weight": float(weights.get(ticker, 0.0)),
         }
         rows.append(row)

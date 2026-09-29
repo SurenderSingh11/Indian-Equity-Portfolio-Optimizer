@@ -33,12 +33,6 @@ type-check: ## Run type checking with mypy
 test: ## Run tests
 	poetry run pytest
 
-test-cov: ## Run tests with coverage
-	poetry run pytest --cov=src --cov-report=term-missing --cov-report=html
-
-test-watch: ## Run tests in watch mode
-	poetry run pytest-watch
-
 clean: ## Remove Python cache files
 	find . -type d -name "__pycache__" -exec rm -r {} +
 	find . -type f -name "*.pyc" -delete

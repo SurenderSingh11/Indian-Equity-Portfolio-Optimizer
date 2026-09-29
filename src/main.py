@@ -8,10 +8,10 @@ from typing import Any
 
 import pandas as pd
 
-from src.data import append_predictions, extract_data, preprocess_data
+from src.data import append_predictions, collect_recent_prices, extract_data, preprocess_data
 from src.database import save_results_to_supabase
 from src.model import ProphetModel
-from src.optimizer import optimize_portfolio_mean_variance
+from src.optimiser import optimize_portfolio_mean_variance
 from src.settings import END_DATE, PORTFOLIO_TICKERS, START_DATE
 
 # Set up logging
@@ -62,15 +62,18 @@ def run_optimisation(
     model = ProphetModel()
     predictions, predicted_returns = model.predict_for_tickers(portfolio_data)
 
-    # 4. Append predictions to historical data
-    new_data = append_predictions(portfolio_data, predictions, predicted_returns)
+    # 4. Collect actual price history for the past month
+    actual_prices_last_month = collect_recent_prices(portfolio_data)
+
+    # 5. Append predictions to historical data
+    predicted_data = append_predictions(portfolio_data, predictions, predicted_returns)
 
     # 5. Current prices for logging
     current_prices = {ticker: df["Price"].iloc[-1] for ticker, df in portfolio_data.items()}
 
     # 6. Optimise portfolio using predicted returns as expected returns
     logger.info("Calculating optimal portfolio allocation...")
-    optimal_weights = optimize_portfolio_mean_variance(new_data)
+    optimal_weights = optimize_portfolio_mean_variance(predicted_data)
 
     # 7. Convert weights to dictionary
     weights_dict = optimal_weights.to_dict()
@@ -95,6 +98,7 @@ def run_optimisation(
         "date": as_of_date,
         "predictions": predictions,
         "predicted_returns": predicted_returns,
+        "actual_prices_last_month": actual_prices_last_month,
         "weights": weights_dict,
     }
 
@@ -108,7 +112,6 @@ def main() -> None:
             logger.error("Optimisation returned empty result")
             sys.exit(1)
 
-        # Save to Supabase
         try:
             save_results_to_supabase(result)
             print("\nResults successfully saved to Supabase database")

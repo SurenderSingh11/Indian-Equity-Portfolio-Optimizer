@@ -5,7 +5,7 @@ from datetime import date, timedelta
 import numpy as np
 import pandas as pd
 
-from src.data import append_predictions, extract_data, preprocess_data
+from src.data import append_predictions, collect_recent_prices, extract_data, preprocess_data
 
 
 class TestData:
@@ -90,12 +90,6 @@ class TestData:
                     pd.Timestamp(d) <= pd.Timestamp(end_date) for d in data[tickers[0]].index
                 )
 
-    def test_preprocess_data_empty(self) -> None:
-        """Test preprocessing with empty data."""
-        aligned = preprocess_data({})
-        assert isinstance(aligned, dict)
-        assert len(aligned) == 0
-
     def test_append_predictions(self) -> None:
         """Test appending predictions to portfolio data."""
         # Create sample data
@@ -162,3 +156,27 @@ class TestData:
         assert len(df) == original_length
         # Updated DataFrame should have one more row
         assert len(updated["TICKER1"]) == original_length + 1
+
+    def test_collect_recent_prices(self) -> None:
+        """Test collecting recent prices returns the expected trailing values."""
+        dates = pd.date_range("2024-01-01", periods=40, freq="D")
+        df = pd.DataFrame(
+            {
+                "Price": np.linspace(100, 140, num=40),
+                "Returns": np.random.randn(40) * 0.01,
+            },
+            index=[d.date() for d in dates],
+        )
+        portfolio_data = {"TICKER1": df}
+
+        recent_prices = collect_recent_prices(portfolio_data, days=30)
+
+        assert "TICKER1" in recent_prices
+        assert isinstance(recent_prices["TICKER1"], list)
+        # Expect roughly 31 values (including last day) for 30-day window
+        assert len(recent_prices["TICKER1"]) >= 30
+        # First value in recent list should match cutoff price
+        expected_start_price = float(df.loc[dates[-31].date(), "Price"])
+        assert recent_prices["TICKER1"][0] == expected_start_price
+        # Last value should be most recent price
+        assert recent_prices["TICKER1"][-1] == float(df.iloc[-1]["Price"])

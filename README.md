@@ -252,7 +252,7 @@ make test
 make test-cov
 
 # Run specific test file
-poetry run pytest tests/test_optimizer.py
+poetry run pytest tests/test_optimiser.py
 ```
 
 ### Code Quality

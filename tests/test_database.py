@@ -1,6 +1,8 @@
 """Tests for database module."""
 
+import json
 import uuid
+from datetime import date
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -53,9 +55,11 @@ class TestSaveResultsToSupabase:
 
         # Test data
         result = {
+            "date": date(2024, 1, 31),
             "predictions": {"AAPL": 150.25, "MSFT": 380.50},
             "predicted_returns": {"AAPL": 0.02, "MSFT": 0.015},
             "weights": {"AAPL": 0.4, "MSFT": 0.6},
+            "actual_prices_last_month": {"AAPL": [148.0], "MSFT": [375.0]},
         }
 
         # Call function
@@ -74,24 +78,31 @@ class TestSaveResultsToSupabase:
         first_row = insert_call_args[0]
         assert "id" in first_row
         assert "created_at" in first_row
-        assert "stock" in first_row
-        assert "price_prediction" in first_row
-        assert "return_prediction" in first_row
+        assert "as_of_date" in first_row
+        assert "ticker" in first_row
+        assert "predicted_price" in first_row
+        assert "predicted_return" in first_row
+        assert "actual_prices_last_month" in first_row
         assert "portfolio_weight" in first_row
 
         # Check ID is a valid UUID string
         uuid.UUID(first_row["id"])  # Will raise if invalid UUID
 
         # Check values
-        assert first_row["stock"] in ("AAPL", "MSFT")
-        if first_row["stock"] == "AAPL":
-            assert first_row["price_prediction"] == 150.25
-            assert first_row["return_prediction"] == 0.02
+        assert first_row["ticker"] in ("AAPL", "MSFT")
+        assert first_row["as_of_date"] == "2024-01-31"
+        if first_row["ticker"] == "AAPL":
+            assert first_row["predicted_price"] == 150.25
+            assert first_row["predicted_return"] == 0.02
             assert first_row["portfolio_weight"] == 0.4
+            actuals = json.loads(first_row["actual_prices_last_month"])
+            assert actuals == [148.0]
         else:
-            assert first_row["price_prediction"] == 380.50
-            assert first_row["return_prediction"] == 0.015
+            assert first_row["predicted_price"] == 380.50
+            assert first_row["predicted_return"] == 0.015
             assert first_row["portfolio_weight"] == 0.6
+            actuals = json.loads(first_row["actual_prices_last_month"])
+            assert actuals == [375.0]
 
         mock_insert.execute.assert_called_once()
 
@@ -102,9 +113,11 @@ class TestSaveResultsToSupabase:
         mock_get_client.return_value = mock_client
 
         result = {
+            "date": date(2024, 1, 31),
             "predictions": {},
             "predicted_returns": {},
             "weights": {},
+            "actual_prices_last_month": {},
         }
 
         save_results_to_supabase(result)
@@ -127,7 +140,9 @@ class TestSaveResultsToSupabase:
 
         # Missing predicted_returns and weights
         result = {
+            "date": date(2024, 1, 31),
             "predictions": {"AAPL": 150.25},
+            "actual_prices_last_month": {"AAPL": [148.0]},
         }
 
         save_results_to_supabase(result)
@@ -135,10 +150,11 @@ class TestSaveResultsToSupabase:
         # Should still work, using defaults
         insert_call_args = mock_table.insert.call_args[0][0]
         assert len(insert_call_args) == 1
-        assert insert_call_args[0]["stock"] == "AAPL"
-        assert insert_call_args[0]["price_prediction"] == 150.25
-        assert insert_call_args[0]["return_prediction"] == 0.0  # Default
+        assert insert_call_args[0]["ticker"] == "AAPL"
+        assert insert_call_args[0]["predicted_price"] == 150.25
+        assert insert_call_args[0]["predicted_return"] == 0.0  # Default
         assert insert_call_args[0]["portfolio_weight"] == 0.0  # Default
+        assert json.loads(insert_call_args[0]["actual_prices_last_month"]) == [148.0]
 
     @patch("src.database.get_supabase_client")
     def test_save_results_to_supabase_insert_failure(self, mock_get_client: MagicMock) -> None:
@@ -153,9 +169,11 @@ class TestSaveResultsToSupabase:
         mock_get_client.return_value = mock_client
 
         result = {
+            "date": date(2024, 1, 31),
             "predictions": {"AAPL": 150.25},
             "predicted_returns": {"AAPL": 0.02},
             "weights": {"AAPL": 1.0},
+            "actual_prices_last_month": {"AAPL": [148.0]},
         }
 
         # Should propagate the exception
@@ -176,9 +194,11 @@ class TestSaveResultsToSupabase:
         mock_get_client.return_value = mock_client
 
         result = {
+            "date": date(2024, 1, 31),
             "predictions": {"TSLA": 250.75},
             "predicted_returns": {"TSLA": -0.01},
             "weights": {"TSLA": 0.25},
+            "actual_prices_last_month": {"TSLA": [255.0]},
         }
 
         save_results_to_supabase(result)
@@ -189,16 +209,20 @@ class TestSaveResultsToSupabase:
         # Check all required fields are present
         assert "id" in row
         assert "created_at" in row
-        assert "stock" in row
-        assert "price_prediction" in row
-        assert "return_prediction" in row
+        assert "as_of_date" in row
+        assert "ticker" in row
+        assert "predicted_price" in row
+        assert "predicted_return" in row
+        assert "actual_prices_last_month" in row
         assert "portfolio_weight" in row
 
         # Check ID is a valid UUID
         uuid.UUID(row["id"])  # Will raise if invalid UUID
 
         # Check values
-        assert row["stock"] == "TSLA"
-        assert row["price_prediction"] == 250.75
-        assert row["return_prediction"] == -0.01
+        assert row["as_of_date"] == "2024-01-31"
+        assert row["ticker"] == "TSLA"
+        assert row["predicted_price"] == 250.75
+        assert row["predicted_return"] == -0.01
         assert row["portfolio_weight"] == 0.25
+        assert json.loads(row["actual_prices_last_month"]) == [255.0]
