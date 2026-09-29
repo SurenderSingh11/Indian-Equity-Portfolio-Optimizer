@@ -11,3 +11,6 @@ END_DATE = datetime.now().strftime("%Y-%m-%d")
 
 # Stock Allocation
 PORTFOLIO_TICKERS = ["KO", "REP.MC", "MSFT", "AAPL", "TSLA", "AMZN"]
+
+# Database
+SUPABASE_TABLE_NAME = "stock_optimise"

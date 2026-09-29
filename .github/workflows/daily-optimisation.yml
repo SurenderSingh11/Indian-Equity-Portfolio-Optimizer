@@ -37,31 +37,17 @@ jobs:
       - name: Install dependencies
         run: poetry install --no-interaction
 
-      - name: Create results directory
-        run: mkdir -p results
-
-      - name: Run portfolio optimisation and save results
+      - name: Run portfolio optimisation and save to Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: |
-          poetry run python -m src.main --save-to-files || true
+          poetry run python -m src.main || true
         continue-on-error: true
-
-      - name: Upload results as artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: optimisation-results-${{ github.run_number }}
-          path: results/
-          retention-days: 90
 
       - name: Display results
         if: always()
         run: |
           echo "## Portfolio Optimisation Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          if [ -f results/optimisation-*.txt ]; then
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            cat results/optimisation-*.txt >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-          else
-            echo "No results file found" >> $GITHUB_STEP_SUMMARY
-          fi
+          echo "Results have been saved to Supabase database." >> $GITHUB_STEP_SUMMARY
