@@ -169,7 +169,9 @@ def pie_chart(weights_df: pd.DataFrame):
 
 def run_dashboard() -> None:
     st.title("📊 Portfolio Forecast Dashboard")
-    st.caption("Latest Prophet predictions, portfolio weights, and performance analysis sourced from Supabase.")
+    st.caption(
+        "Latest Prophet predictions, portfolio weights, and performance analysis sourced from Supabase."
+    )
 
     df = load_supabase_predictions()
     if df.empty:
@@ -177,7 +179,9 @@ def run_dashboard() -> None:
         return
 
     available_dates = sorted(df["as_of_date"].unique(), reverse=True)
-    selected_date = st.selectbox("Select as-of date", options=available_dates, format_func=lambda d: d.strftime("%Y-%m-%d"))
+    selected_date = st.selectbox(
+        "Select as-of date", options=available_dates, format_func=lambda d: d.strftime("%Y-%m-%d")
+    )
 
     date_df = df[df["as_of_date"] == selected_date].copy().sort_values("ticker")
 
@@ -218,7 +222,9 @@ def run_dashboard() -> None:
 
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("Latest Actual Price", f"${latest_actual:.2f}" if latest_actual is not None else "—")
+        st.metric(
+            "Latest Actual Price", f"${latest_actual:.2f}" if latest_actual is not None else "—"
+        )
     with col2:
         st.metric("Predicted Price", f"${ticker_row['predicted_price']:.2f}")
     with col3:
@@ -253,14 +259,18 @@ def run_dashboard() -> None:
             )
         )
         st.altair_chart(actual_chart + predicted_chart, use_container_width=True)
-        st.caption("Blue line shows the last month of actual prices; the orange dot is the predicted next-day price.")
+        st.caption(
+            "Blue line shows the last month of actual prices; the orange dot is the predicted next-day price."
+        )
     else:
         st.info("No historical price data available for this ticker.")
 
     st.subheader("Prediction Accuracy")
     perf_df = compute_prediction_performance(df.to_json(orient="records", date_format="iso"))
     if perf_df.empty:
-        st.info("Not enough historical runs to evaluate predictions yet. Check back after multiple runs.")
+        st.info(
+            "Not enough historical runs to evaluate predictions yet. Check back after multiple runs."
+        )
     else:
         ticker_perf = perf_df[perf_df["ticker"] == selected_ticker].copy()
         if ticker_perf.empty:
@@ -314,7 +324,9 @@ def run_dashboard() -> None:
                         alt.Tooltip("actual_price:Q", title="Actual", format=".2f"),
                         alt.Tooltip("error:Q", title="Error", format=".2f"),
                     ],
-                    color=alt.condition("datum.error > 0", alt.value("#2ca02c"), alt.value("#d62728")),
+                    color=alt.condition(
+                        "datum.error > 0", alt.value("#2ca02c"), alt.value("#d62728")
+                    ),
                 )
             )
             st.altair_chart(error_chart, use_container_width=True)
@@ -326,4 +338,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
