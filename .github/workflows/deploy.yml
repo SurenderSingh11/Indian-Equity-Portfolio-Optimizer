@@ -18,4 +18,4 @@ jobs:
           host: 31.97.116.211 # Your VPS IP
           username: root # Your SSH username
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: /root/Prophet-Forecasting-For-Portfolio-Optimisation/deploy.sh
+          script: /root/Prophet-Forecasting-For-Portfolio-Optimisation/scripts/deploy.sh
