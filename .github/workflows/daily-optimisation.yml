@@ -7,7 +7,7 @@ on:
   workflow_dispatch:  # Allows manual triggering from GitHub UI
 
 jobs:
-  optimize:
+  optimise:
     runs-on: ubuntu-latest
     
     steps:
@@ -41,6 +41,4 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-        run: |
-          poetry run python -m src.main || true
-        continue-on-error: true
+        run: poetry run python -m src.main
