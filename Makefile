@@ -1,4 +1,4 @@
-.PHONY: help install install-dev update lock format lint type-check test test-cov clean clean-all run
+.PHONY: help install install-dev format lint type-check test clean clean-all run dashboard
 
 help: ## Show this help message
 	@echo "Available commands:"
@@ -9,12 +9,6 @@ install: ## Install project dependencies
 
 install-dev: ## Install project with dev dependencies
 	poetry install
-
-update: ## Update dependencies
-	poetry update
-
-lock: ## Lock dependencies
-	poetry lock
 
 format: ## Format code with black
 	poetry run black src tests
@@ -54,10 +48,7 @@ setup: install-dev ## Initial setup: install dev dependencies
 
 check: format lint type-check test ## Run all checks (format, lint, type-check, test)
 
-ci: lint type-check test-cov ## Run CI pipeline checks
-
-shell: ## Open poetry shell
-	poetry shell
+ci: lint type-check ## Run CI pipeline checks
 
 run: ## Run the main script
 	poetry run python -m src.main
