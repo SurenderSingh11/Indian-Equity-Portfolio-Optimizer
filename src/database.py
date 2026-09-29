@@ -64,8 +64,8 @@ def save_results_to_supabase(result: dict[str, Any]) -> None:
             "id": str(uuid.uuid4()),
             "created_at": datetime.now().isoformat(),
             "stock": ticker,
-            "price": float(predictions.get(ticker, 0.0)),
-            "daily_return": float(predicted_returns.get(ticker, 0.0)),
+            "price_prediction": float(predictions.get(ticker, 0.0)),
+            "return_prediction": float(predicted_returns.get(ticker, 0.0)),
             "portfolio_weight": float(weights.get(ticker, 0.0)),
         }
         rows.append(row)

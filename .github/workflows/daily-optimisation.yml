@@ -44,10 +44,3 @@ jobs:
         run: |
           poetry run python -m src.main || true
         continue-on-error: true
-
-      - name: Display results
-        if: always()
-        run: |
-          echo "## Portfolio Optimisation Results" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Results have been saved to Supabase database." >> $GITHUB_STEP_SUMMARY

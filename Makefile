@@ -68,5 +68,8 @@ shell: ## Open poetry shell
 run: ## Run the main script
 	poetry run python -m src.main
 
+dashboard: ## Run Streamlit dashboard
+	poetry run streamlit run src/frontend.py
+
 .DEFAULT_GOAL := help
 

@@ -3,7 +3,7 @@
 import numpy as np
 import pandas as pd
 
-from src.model import ProphetModel
+from src.model import ProphetModel, _get_us_trading_holidays
 
 
 class TestProphetModel:
@@ -104,3 +104,99 @@ class TestProphetModel:
         current_price1 = df1["Price"].iloc[-1]
         expected_return1 = (predictions["TICKER1"] - current_price1) / current_price1
         assert np.isclose(predicted_returns["TICKER1"], expected_return1, rtol=1e-5)
+
+    def test_get_us_trading_holidays(self) -> None:
+        """Test US trading holidays generation."""
+        holidays = _get_us_trading_holidays(2024, 2024)
+
+        assert isinstance(holidays, pd.DataFrame)
+        assert len(holidays) > 0
+        assert "holiday" in holidays.columns
+        assert "ds" in holidays.columns
+        assert "lower_window" in holidays.columns
+        assert "upper_window" in holidays.columns
+
+        # Check specific holidays exist
+        holiday_names = holidays["holiday"].unique()
+        assert "new_years" in holiday_names
+        assert "christmas" in holiday_names
+        assert "thanksgiving" in holiday_names
+
+        # Check that all holidays have proper windows
+        assert all(holidays["lower_window"] == -1)
+        assert all(holidays["upper_window"] == 1)
+
+        # Check date format
+        assert pd.api.types.is_datetime64_any_dtype(holidays["ds"])
+
+    def test_get_us_trading_holidays_multiple_years(self) -> None:
+        """Test holiday generation for multiple years."""
+        holidays = _get_us_trading_holidays(2023, 2025)
+
+        assert len(holidays) >= 30  # Should have ~10 holidays per year (3 years = 30 holidays)
+
+        # Check years are included
+        years = holidays["ds"].dt.year.unique()
+        assert 2023 in years
+        assert 2024 in years
+        assert 2025 in years
+
+    def test_fit_with_holidays(self) -> None:
+        """Test that Prophet model includes holidays when fitting."""
+        dates = pd.date_range("2024-01-01", periods=100, freq="D")
+        prices = 100 + np.cumsum(np.random.randn(100) * 0.5)
+        price_series = pd.Series(prices, index=dates)
+
+        model = ProphetModel()
+        model.fit(price_series)
+
+        assert model.model is not None
+        # Check that holidays are included
+        assert hasattr(model.model, "holidays")
+        if model.model.holidays is not None:
+            assert len(model.model.holidays) > 0
+
+    def test_fit_with_seasonality_config(self) -> None:
+        """Test that Prophet model has seasonality properly configured."""
+        dates = pd.date_range("2024-01-01", periods=100, freq="D")
+        prices = 100 + np.cumsum(np.random.randn(100) * 0.5)
+        price_series = pd.Series(prices, index=dates)
+
+        model = ProphetModel()
+        model.fit(price_series)
+
+        assert model.model is not None
+        # Check seasonality settings
+        assert model.model.yearly_seasonality is True
+        assert model.model.weekly_seasonality is True
+        assert model.model.daily_seasonality is False
+        assert model.model.seasonality_mode == "additive"
+
+    def test_fit_with_holidays_and_seasonality(self) -> None:
+        """Test that model works correctly with both holidays and seasonality."""
+        dates = pd.date_range("2024-01-01", periods=200, freq="D")
+        prices = 100 + np.cumsum(np.random.randn(200) * 0.5)
+        price_series = pd.Series(prices, index=dates)
+
+        model = ProphetModel()
+        model.fit(price_series)
+
+        # Make prediction to ensure everything works
+        prediction = model.predict_next(price_series)
+
+        assert isinstance(prediction, float)
+        assert prediction > 0
+        assert model.model is not None
+
+    def test_fit_with_short_data_no_holidays(self) -> None:
+        """Test model handles data with no holidays in range gracefully."""
+        # Use a date range that might not have holidays
+        dates = pd.date_range("2024-02-15", periods=10, freq="D")
+        prices = 100 + np.cumsum(np.random.randn(10) * 0.5)
+        price_series = pd.Series(prices, index=dates)
+
+        model = ProphetModel()
+        # Should not raise an error even if no holidays in range
+        model.fit(price_series)
+
+        assert model.model is not None
