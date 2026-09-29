@@ -15,7 +15,7 @@ git pull
 # 2. Check for dependency changes and install them
 if git diff --name-only HEAD@{1} HEAD | grep -q "pyproject.toml"; then
     echo "pyproject.toml changed. Installing new dependencies..."
-    poetry install
+    /root/.local/bin/poetry install
 fi
 
 # 3. Restart the Streamlit service
