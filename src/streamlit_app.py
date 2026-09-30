@@ -8,6 +8,12 @@ import os
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import sys
+from pathlib import Path
+
+# Add project root directory to python path
+sys.path.append(str(Path(__file__).resolve().parent.parent))
+
 import streamlit as st
 from dotenv import load_dotenv
 from streamlit_oauth import OAuth2Component
