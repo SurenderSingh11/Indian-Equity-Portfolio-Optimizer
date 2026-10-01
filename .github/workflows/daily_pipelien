@@ -1,0 +1,114 @@
+name: Enterprise Daily Pipeline - Data Extraction & Forecast Ingestion
+
+on:
+  schedule:
+    # Trigger every weekday at 10:30 AM UTC (4:00 PM IST - Post Market Close)
+    - cron: '30 10 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Execution Environment (production/development)'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - development
+      run_backtest:
+        description: 'Trigger strategy backtest after extraction'
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: daily-pipeline-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  run-pipeline:
+    name: Execute Model & Data Pipeline
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'production' }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Verify Environment Secrets
+        run: |
+          if [ -z "${{ secrets.SUPABASE_URL }}" ] || [ -z "${{ secrets.SUPABASE_KEY }}" ]; then
+            echo "::error::Required Supabase credentials missing from secrets context."
+            exit 1
+          fi
+
+      - name: Execute Pipeline with Multi-Level Retry Logic
+        id: execute_pipeline
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          ENV: ${{ github.event.inputs.environment || 'production' }}
+          RUN_BACKTEST: ${{ github.event.inputs.run_backtest || 'false' }}
+        run: |
+          MAX_RETRIES=3
+          RETRY_COUNT=0
+          SUCCESS=0
+
+          until [ $RETRY_COUNT -ge $MAX_RETRIES ]
+          do
+            echo "Attempting pipeline execution (Attempt $((RETRY_COUNT+1))/$MAX_RETRIES)..."
+            python -m src.main && SUCCESS=1 && break
+            
+            RETRY_COUNT=$((RETRY_COUNT+1))
+            SLEEP_TIME=$((RETRY_COUNT * 30))
+            echo "Execution failed. Retrying in ${SLEEP_TIME}s..."
+            sleep $SLEEP_TIME
+          done
+
+          if [ $SUCCESS -eq 0 ]; then
+            echo "::error::Pipeline execution failed after $MAX_RETRIES retries."
+            exit 1
+          fi
+
+      - name: Notify Slack/Teams on Failure
+        if: failure()
+        env:
+          WEBHOOK_URL: ${{ secrets.PIPELINE_ALERT_WEBHOOK }}
+        run: |
+          if [ -n "$WEBHOOK_URL" ]; then
+            REPO="${{ github.repository }}"
+            RUN_ID="${{ github.run_id }}"
+            RUN_URL="https://github.com/${REPO}/actions/runs/${RUN_ID}"
+            
+            # Format JSON for Slack / Webhook
+            PAYLOAD=$(cat <<EOF
+            {
+              "text": "*Pipeline Execution Failure Alert*",
+              "attachments": [
+                {
+                  "color": "#FF0000",
+                  "fields": [
+                    {"title": "Repository", "value": "${REPO}", "short": true},
+                    {"title": "Environment", "value": "${{ github.event.inputs.environment || 'production' }}", "short": true},
+                    {"title": "Workflow Run", "value": "<${RUN_URL}|View Action Logs>", "short": false}
+                  ]
+                }
+              ]
+            }
+            EOF
+            )
+            
+            curl -X POST -H 'Content-type: application/json' --data "$PAYLOAD" "$WEBHOOK_URL"
+          else
+            echo "No notification webhook configured. Skipping alert."
+          fi
