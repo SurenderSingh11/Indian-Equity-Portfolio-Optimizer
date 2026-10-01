@@ -6,14 +6,6 @@ on:
     - cron: '30 10 * * 1-5'
   workflow_dispatch:
     inputs:
-      environment:
-        description: 'Execution Environment (production/development)'
-        required: true
-        default: 'production'
-        type: choice
-        options:
-          - production
-          - development
       run_backtest:
         description: 'Trigger strategy backtest after extraction'
         required: false
@@ -28,7 +20,6 @@ jobs:
   run-pipeline:
     name: Execute Model & Data Pipeline
     runs-on: ubuntu-latest
-    environment: ${{ github.event.inputs.environment || 'production' }}
 
     steps:
       - name: Checkout Repository
@@ -48,7 +39,7 @@ jobs:
       - name: Verify Environment Secrets
         run: |
           if [ -z "${{ secrets.SUPABASE_URL }}" ] || [ -z "${{ secrets.SUPABASE_KEY }}" ]; then
-            echo "::error::Required Supabase credentials missing from secrets context."
+            echo "::error::Required Supabase credentials (SUPABASE_URL / SUPABASE_KEY) missing from GitHub Secrets."
             exit 1
           fi
 
@@ -57,7 +48,7 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-          ENV: ${{ github.event.inputs.environment || 'production' }}
+          ENV: 'production'
           RUN_BACKTEST: ${{ github.event.inputs.run_backtest || 'false' }}
         run: |
           MAX_RETRIES=3
@@ -90,25 +81,9 @@ jobs:
             RUN_ID="${{ github.run_id }}"
             RUN_URL="https://github.com/${REPO}/actions/runs/${RUN_ID}"
             
-            # Format JSON for Slack / Webhook
-            PAYLOAD=$(cat <<EOF
-            {
-              "text": "*Pipeline Execution Failure Alert*",
-              "attachments": [
-                {
-                  "color": "#FF0000",
-                  "fields": [
-                    {"title": "Repository", "value": "${REPO}", "short": true},
-                    {"title": "Environment", "value": "${{ github.event.inputs.environment || 'production' }}", "short": true},
-                    {"title": "Workflow Run", "value": "<${RUN_URL}|View Action Logs>", "short": false}
-                  ]
-                }
-              ]
-            }
-            EOF
-            )
-            
-            curl -X POST -H 'Content-type: application/json' --data "$PAYLOAD" "$WEBHOOK_URL"
+            curl -X POST -H 'Content-type: application/json' \
+              --data "{\"text\":\"*Pipeline Execution Failure Alert*\nRepository: ${REPO}\nWorkflow Run: ${RUN_URL}\"}" \
+              "$WEBHOOK_URL"
           else
             echo "No notification webhook configured. Skipping alert."
           fi
