@@ -1,6 +1,8 @@
 """Main entry point for Indian stock market portfolio optimisation ETL and ML pipeline."""
 
 from __future__ import annotations
+from pathlib import Path
+from dotenv import load_dotenv
 
 import logging
 import os
@@ -16,6 +18,10 @@ from src.model import ProphetModel
 from src.optimiser import optimize_portfolio_mean_variance
 from src.processor import append_predictions, collect_recent_prices, preprocess_data
 from src.settings import END_DATE, PORTFOLIO_TICKERS, START_DATE
+
+# Explicitly load .env from project root directory
+env_path = Path(__file__).resolve().parent.parent / '.env'
+load_dotenv(dotenv_path=env_path)
 
 # Configure Enterprise Logger
 logging.basicConfig(
