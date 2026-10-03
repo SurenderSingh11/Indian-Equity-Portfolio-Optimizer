@@ -1,15 +1,22 @@
 """Quantitative Backtesting Engine for Portfolio Optimization."""
 
 import logging
-import numpy as np
-import pandas as pd
-from datetime import datetime
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Tuple
 
+import numpy as np
+import pandas as pd
+from dotenv import load_dotenv
+
+from .database import save_results_to_supabase
 from .extractor import extract_data
-from .model import generate_forecasts
-from .optimizer import optimize_portfolio
-from .database import get_db_engine, save_dataframe
+from .model import ProphetModel
+from .optimiser import optimize_portfolio_mean_variance
+
+# Load .env file from project root directory
+env_path = Path(__file__).resolve().parent.parent / ".env"
+load_dotenv(dotenv_path=env_path)
 
 logger = logging.getLogger(__name__)
 
@@ -30,11 +37,12 @@ class BacktestEngine:
         self.risk_free_rate = risk_free_rate
         self.rebalance_freq_days = rebalance_freq_days
         self.training_window_days = training_window_days
+        self.model = ProphetModel()
 
     def _fetch_and_prepare_data(
         self, start_date: str, end_date: str
     ) -> Tuple[pd.DataFrame, pd.Series]:
-        """Fetch historical prices for assets and benchmark using updated batch extractor."""
+        """Fetch historical prices for assets and benchmark using batch extractor."""
         all_tickers = list(set(self.tickers + [self.benchmark_ticker]))
         extracted_data = extract_data(all_tickers, start_date=start_date, end_date=end_date)
 
@@ -49,6 +57,10 @@ class BacktestEngine:
             raise ValueError("No asset ticker data retrieved from batch extractor.")
 
         asset_prices = pd.DataFrame(price_dict).ffill().bfill()
+
+        # Convert index to DatetimeIndex if it contains datetime.date objects
+        if not isinstance(asset_prices.index, pd.DatetimeIndex):
+            asset_prices.index = pd.to_datetime(asset_prices.index)
 
         # Extract benchmark prices aligned with asset dates
         benchmark_prices = (
@@ -83,29 +95,27 @@ class BacktestEngine:
         for i in range(self.training_window_days, len(dates), self.rebalance_freq_days):
             train_prices = asset_prices.iloc[i - self.training_window_days : i]
 
-            # 1. Generate Prophet forecasts
-            forecasts = {}
+            # Build batch portfolio input for ProphetModel and Optimizer
+            portfolio_data = {}
             for ticker in self.tickers:
-                if ticker not in train_prices.columns:
-                    continue
-                ticker_df = pd.DataFrame(
-                    {
-                        "Date": train_prices.index,
-                        "Price": train_prices[ticker].values,
-                        "Returns": train_prices[ticker].pct_change().fillna(0).values,
-                    }
-                ).set_index("Date")
+                if ticker in train_prices.columns:
+                    ticker_series = train_prices[ticker]
+                    portfolio_data[ticker] = pd.DataFrame({
+                        "Price": ticker_series,
+                        "Returns": ticker_series.pct_change().fillna(0)
+                    })
 
+            # 1. Generate Prophet forecasts via ProphetModel
+            if portfolio_data:
                 try:
-                    forecast = generate_forecasts(ticker_df, days_ahead=self.rebalance_freq_days)
-                    forecasts[ticker] = forecast
+                    self.model.predict_for_tickers(portfolio_data)
                 except Exception as e:
-                    logger.warning(f"Forecast failed for {ticker} at index {i}: {e}")
+                    logger.warning(f"Prophet forecast batch failed at index {i}: {e}")
 
-            # 2. Optimize portfolio weights
-            if forecasts:
+            # 2. Optimize portfolio weights using Mean-Variance optimization
+            if portfolio_data:
                 try:
-                    optimized_weights = optimize_portfolio(forecasts, train_prices)
+                    optimized_weights = optimize_portfolio_mean_variance(portfolio_data)
                     current_weights = np.array(
                         [optimized_weights.get(t, 0.0) for t in self.tickers]
                     )
@@ -187,17 +197,19 @@ class BacktestEngine:
         metrics: dict[str, float],
         schema: str = "dev",
     ) -> None:
-        """Persist performance curves and risk metrics to Supabase."""
-        engine = get_db_engine()
-
-        curve_df = equity_df.reset_index().rename(columns={"index": "date"})
-        curve_df["created_at"] = datetime.utcnow()
-
-        metrics_df = pd.DataFrame([metrics])
-        metrics_df["created_at"] = datetime.utcnow()
-
-        save_dataframe(curve_df, table_name="backtest_equity_curve", engine=engine, schema=schema)
-        save_dataframe(metrics_df, table_name="backtest_metrics", engine=engine, schema=schema)
+        """Persist performance metrics and allocations to Supabase."""
+        result_payload = {
+            "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            "schema": schema,
+            "metrics": {
+                "BACKTEST_PORTFOLIO": {
+                    "mape": metrics.get("annualized_portfolio_return", 0.0),
+                    "rmse": metrics.get("annualized_volatility", 0.0),
+                    "mae": metrics.get("max_drawdown", 0.0),
+                }
+            },
+        }
+        save_results_to_supabase(result_payload)
         logger.info(f"Successfully persisted backtest output to schema '{schema}'.")
 
 
