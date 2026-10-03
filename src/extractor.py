@@ -23,6 +23,9 @@ def _process_ticker_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     else:
         raise KeyError("Neither 'Close' nor 'Adj Close' column found in extracted data.")
 
+    # Fill occasional missing price points before return calculations
+    df["Price"] = df["Price"].ffill().bfill()
+    
     # Compute daily percentage returns and drop NaN row
     df["Returns"] = df["Price"].pct_change()
     df = df.dropna()
