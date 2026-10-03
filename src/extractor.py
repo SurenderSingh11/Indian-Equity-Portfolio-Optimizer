@@ -1,44 +1,12 @@
 """Data extraction module for fetching stock data from Yahoo Finance."""
 
 import logging
-import requests
 import pandas as pd
 import yfinance as yf
-from urllib3.util import Retry
-from requests.adapters import HTTPAdapter
 
 from .settings import END_DATE, START_DATE
 
 logger = logging.getLogger(__name__)
-
-
-def _get_yf_session() -> requests.Session:
-    """Create a custom requests session with browser headers and retries to prevent connection resets."""
-    session = requests.Session()
-    
-    # Modern Chrome User-Agent to pass Yahoo Finance SSL/Header checks
-    session.headers.update({
-        "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/122.0.0.0 Safari/537.36"
-        ),
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-    })
-    
-    # Setup automatic retry strategy for connection failures
-    retries = Retry(
-        total=3,
-        backoff_factor=1,
-        status_forcelist=[429, 500, 502, 503, 504],
-        raise_on_status=False,
-    )
-    adapter = HTTPAdapter(max_retries=retries)
-    session.mount("https://", adapter)
-    session.mount("http://", adapter)
-    
-    return session
 
 
 def _process_ticker_dataframe(df: pd.DataFrame) -> pd.DataFrame:
@@ -67,12 +35,13 @@ def _process_ticker_dataframe(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _extract_single_ticker_data(
-    ticker: str, start_date: str, end_date: str, session: requests.Session
+    ticker: str, start_date: str, end_date: str
 ) -> pd.DataFrame | None:
     """Extract and process historical data for a single ticker."""
     try:
-        stock = yf.Ticker(ticker, session=session)
-        df = stock.history(start=start_date, end=end_date)
+        # Let yfinance handle session management natively
+        stock = yf.Ticker(ticker)
+        df = stock.history(start=start_date, end=end_date, auto_adjust=True)
 
         # Fallback to yf.download if Ticker.history returns empty
         if df.empty:
@@ -80,8 +49,8 @@ def _extract_single_ticker_data(
                 ticker,
                 start=start_date,
                 end=end_date,
-                session=session,
                 progress=False,
+                auto_adjust=True,
             )
 
         if df.empty:
@@ -103,10 +72,9 @@ def extract_data(
 ) -> dict[str, pd.DataFrame]:
     """Extract historical stock data for multiple Indian tickers."""
     all_stock_data: dict[str, pd.DataFrame] = {}
-    session = _get_yf_session()
 
     for ticker in tickers:
-        df_processed = _extract_single_ticker_data(ticker, start_date, end_date, session)
+        df_processed = _extract_single_ticker_data(ticker, start_date, end_date)
         if df_processed is not None and not df_processed.empty:
             all_stock_data[ticker] = df_processed
 
