@@ -10,7 +10,7 @@ on:
         description: 'Trigger strategy backtest after extraction'
         required: false
         type: boolean
-        default: false
+        default: true
 
 concurrency:
   group: daily-pipeline-${{ github.ref }}
@@ -43,13 +43,12 @@ jobs:
             exit 1
           fi
 
-      - name: Execute Pipeline with Multi-Level Retry Logic
+      - name: Execute Main Pipeline with Multi-Level Retry Logic
         id: execute_pipeline
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           ENV: 'production'
-          RUN_BACKTEST: ${{ github.event.inputs.run_backtest || 'false' }}
         run: |
           MAX_RETRIES=3
           RETRY_COUNT=0
@@ -70,6 +69,16 @@ jobs:
             echo "::error::Pipeline execution failed after $MAX_RETRIES retries."
             exit 1
           fi
+
+      - name: Execute Strategy Backtest Pipeline
+        if: github.event_name == 'schedule' || github.event.inputs.run_backtest == 'true' || github.event.inputs.run_backtest == true
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          ENV: 'production'
+        run: |
+          echo "Running strategy backtest..."
+          python -m src.backtest
 
       - name: Notify Slack/Teams on Failure
         if: failure()
