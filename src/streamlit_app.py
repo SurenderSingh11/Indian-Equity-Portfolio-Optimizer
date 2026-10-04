@@ -1,3 +1,6 @@
+Here is the complete, updated `src/streamlit_app.py` file with all titles aligned to **"Indian Equity Portfolio Optimizer"**:
+
+```python
 """Modernized Enterprise Streamlit Dashboard for Indian Stock Portfolio Forecasts & Markowitz Optimization.
 
 Integrated with Microsoft Entra ID SSO authentication and Supabase PostgreSQL persistence.
@@ -27,7 +30,7 @@ from src.settings import SUPABASE_TABLE_NAME
 
 # Page Configuration
 st.set_page_config(
-    page_title="NSE Portfolio Optimiser | Executive Suite",
+    page_title="Indian Equity Portfolio Optimizer",
     layout="wide",
     page_icon="📈",
     initial_sidebar_state="expanded",
@@ -157,7 +160,7 @@ if not st.session_state["auth_token"] and not BYPASS_AUTH:
     st.markdown(
         """
         <div class="login-header">
-            <div class="login-title">📈 Enterprise Portfolio Optimiser</div>
+            <div class="login-title">📈 Indian Equity Portfolio Optimizer</div>
             <div class="login-subtitle">Meta Prophet Machine Learning & Markowitz Mean-Variance Framework (NSE India)</div>
         </div>
     """,
@@ -305,7 +308,7 @@ def _parse_price_history(raw: object) -> list[float]:
 
 # --- 4. MAIN MULTI-TAB DASHBOARD ---
 def run_dashboard() -> None:
-    st.title("📈 Quantitative Portfolio Optimiser")
+    st.title("📈 Indian Equity Portfolio Optimizer")
     st.caption("Automated Meta Prophet Price Predictions & SciPy SLSQP Mean-Variance Allocation")
 
     df = load_supabase_predictions()
@@ -316,7 +319,7 @@ def run_dashboard() -> None:
     available_dates = sorted(df["as_of_date"].unique(), reverse=True)
 
     # Date Selection Filter in Sidebar
-    st.sidebar.subheader("⚙️️ Control Panel")
+    st.sidebar.subheader("⚙ Control Panel")
     selected_date = st.sidebar.selectbox(
         "Model Execution Date", options=available_dates, format_func=lambda d: d.strftime("%B %d, %Y")
     )
@@ -488,3 +491,5 @@ def run_dashboard() -> None:
 
 if __name__ == "__main__":
     run_dashboard()
+
+```
