@@ -488,5 +488,3 @@ def run_dashboard() -> None:
 
 if __name__ == "__main__":
     run_dashboard()
-
-```
