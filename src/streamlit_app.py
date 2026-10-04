@@ -1,6 +1,3 @@
-Here is the complete, updated `src/streamlit_app.py` file with all titles aligned to **"Indian Equity Portfolio Optimizer"**:
-
-```python
 """Modernized Enterprise Streamlit Dashboard for Indian Stock Portfolio Forecasts & Markowitz Optimization.
 
 Integrated with Microsoft Entra ID SSO authentication and Supabase PostgreSQL persistence.
