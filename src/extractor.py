@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 def _get_yf_session() -> requests.Session:
-    """Create a custom HTTP session with a standard browser User-Agent to prevent 429 rate limits."""
+    """Create a custom HTTP session with browser headers."""
     session = requests.Session()
     session.headers.update({
         "User-Agent": (
@@ -20,7 +20,7 @@ def _get_yf_session() -> requests.Session:
             "AppleWebKit/537.36 (KHTML, like Gecko) "
             "Chrome/122.0.0.0 Safari/537.36"
         ),
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.5",
     })
     return session
@@ -38,10 +38,7 @@ def _process_ticker_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     else:
         raise KeyError("Neither 'Close' nor 'Adj Close' column found in extracted data.")
 
-    # Fill occasional missing price points before return calculations
     df["Price"] = df["Price"].ffill().bfill()
-
-    # Compute daily percentage returns and drop initial NaN row
     df["Returns"] = df["Price"].pct_change()
     df = df.dropna()
 
@@ -57,15 +54,15 @@ def extract_data(
     end_date: str = END_DATE,
     max_retries: int = 3,
 ) -> dict[str, pd.DataFrame]:
-    """Extract historical stock data for multiple Indian tickers with retry logic and fallback handling."""
+    """Extract historical stock data for multiple Indian tickers with fallback handling."""
     all_stock_data: dict[str, pd.DataFrame] = {}
     session = _get_yf_session()
 
-    # --- 1. ATTEMPT BATCH DOWNLOAD WITH RETRIES ---
+    # --- 1. ATTEMPT BATCH DOWNLOAD WITH VALIDATION ---
     batch_df = pd.DataFrame()
     for attempt in range(1, max_retries + 1):
+        logger.info(f"Downloading ticker batch (Attempt {attempt}/{max_retries})...")
         try:
-            logger.info(f"Downloading ticker batch (Attempt {attempt}/{max_retries})...")
             batch_df = yf.download(
                 tickers=tickers,
                 start=start_date,
@@ -76,23 +73,31 @@ def extract_data(
                 session=session,
             )
 
-            if not batch_df.empty:
-                break
+            # yfinance returns empty DataFrame on 429 rate limit without throwing Exception
+            if not batch_df.empty and len(batch_df.columns) > 0:
+                # Ensure at least one requested ticker exists in MultiIndex or columns
+                if isinstance(batch_df.columns, pd.MultiIndex):
+                    has_data = any(t in batch_df.columns.levels[0] for t in tickers)
+                else:
+                    has_data = True
+
+                if has_data:
+                    break
 
         except Exception as e:
-            logger.warning(f"Batch download attempt {attempt} failed: {e}")
-            if attempt < max_retries:
-                time.sleep(2 * attempt)  # Exponential backoff delay
+            logger.warning(f"Batch download error on attempt {attempt}: {e}")
 
-    # --- 2. PROCESS BATCH RESULT IF SUCCESSFUL ---
+        logger.warning(f"Batch attempt {attempt} returned empty data (Rate limited). Backing off...")
+        time.sleep(3 * attempt)
+
+    # --- 2. PROCESS BATCH RESULT IF DATA WAS RETRIEVED ---
     if isinstance(batch_df, pd.DataFrame) and not batch_df.empty:
         for ticker in tickers:
             try:
                 if len(tickers) == 1:
                     df = batch_df.copy()
                 else:
-                    if ticker not in batch_df.columns.levels[0]:
-                        logger.warning(f"Ticker {ticker} not found in downloaded batch data.")
+                    if not isinstance(batch_df.columns, pd.MultiIndex) or ticker not in batch_df.columns.levels[0]:
                         continue
                     df = batch_df[ticker].dropna(how="all").copy()
 
@@ -110,24 +115,29 @@ def extract_data(
             return all_stock_data
 
     # --- 3. FALLBACK: SEQUENTIAL SINGLE-TICKER DOWNLOAD ---
-    logger.warning("Batch download failed or returned empty data. Switching to sequential ticker download fallback...")
+    logger.warning("Batch download failed. Switching to sequential ticker download with delays...")
     for ticker in tickers:
         for attempt in range(1, max_retries + 1):
             try:
-                ticker_obj = yf.Ticker(ticker, session=session)
-                df = ticker_obj.history(start=start_date, end=end_date, auto_adjust=True)
+                time.sleep(1.5)  # Pause before making individual request
+                df = yf.download(
+                    tickers=ticker,
+                    start=start_date,
+                    end=end_date,
+                    progress=False,
+                    auto_adjust=True,
+                    session=session,
+                )
 
                 if not df.empty:
                     df_processed = _process_ticker_dataframe(df)
                     if not df_processed.empty:
                         all_stock_data[ticker] = df_processed
-                        logger.info(f"Successfully retrieved data for {ticker} via sequential fallback.")
+                        logger.info(f"Successfully retrieved data for {ticker} via sequential download.")
                         break
 
             except Exception as e:
-                logger.warning(f"Sequential download attempt {attempt} for {ticker} failed: {e}")
-                time.sleep(1.5 * attempt)
-
-        time.sleep(1)  # Brief pause between sequential requests to avoid rate limits
+                logger.warning(f"Sequential attempt {attempt} for {ticker} failed: {e}")
+                time.sleep(2 * attempt)
 
     return all_stock_data
