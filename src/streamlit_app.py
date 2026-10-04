@@ -33,7 +33,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# Custom Styling (Dark Institutional Theme)
+# Custom Styling (Dark Institutional Theme & Custom Landing UI)
 st.markdown(
     """
     <style>
@@ -51,6 +51,41 @@ st.markdown(
         border-radius: 8px;
         padding: 12px 16px;
         border: 1px solid #334155;
+    }
+    /* Modern Landing UI CSS */
+    .login-header {
+        text-align: center;
+        padding-top: 2rem;
+        padding-bottom: 1rem;
+    }
+    .login-title {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: #FAFAFA;
+        margin-bottom: 0.5rem;
+    }
+    .login-subtitle {
+        font-size: 1.1rem;
+        color: #A0AAB8;
+        margin-bottom: 2rem;
+    }
+    .feature-card {
+        background-color: #1E222D;
+        border: 1px solid #2A2E39;
+        border-radius: 10px;
+        padding: 1.5rem 1rem;
+        text-align: center;
+        margin-bottom: 1rem;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+    }
+    .feature-icon {
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+    }
+    .feature-title {
+        font-size: 1.05rem;
+        font-weight: 600;
+        color: #E0E0E0;
     }
     </style>
 """,
@@ -116,27 +151,68 @@ def decode_jwt_payload(token_str: str) -> dict:
     return {}
 
 
-# --- 1. UNAUTHENTICATED VIEW ---
+# --- 1. UNAUTHENTICATED LANDING VIEW ---
 if not st.session_state["auth_token"] and not BYPASS_AUTH:
+    # Main Landing Header
     st.markdown(
-        "<h1 style='text-align: center; margin-top: 50px;'>🔒 Enterprise Portfolio Optimiser</h1>",
+        """
+        <div class="login-header">
+            <div class="login-title">📈 Enterprise Portfolio Optimiser</div>
+            <div class="login-subtitle">Meta Prophet Machine Learning & Markowitz Mean-Variance Framework (NSE India)</div>
+        </div>
+    """,
         unsafe_allow_html=True,
     )
-    st.markdown(
-        "<p style='text-align: center; color: #94A3B8;'>Meta Prophet Machine Learning & Markowitz Mean-Variance Framework (NSE India)</p>",
-        unsafe_allow_html=True,
-    )
-    st.divider()
 
-    col1, col2, col3 = st.columns([1, 2, 1])
+    # Feature Preview Cards (3 Columns)
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.markdown(
+            """
+            <div class="feature-card">
+                <div class="feature-icon">🔮</div>
+                <div class="feature-title">Prophet Price Forecasting</div>
+            </div>
+        """,
+            unsafe_allow_html=True,
+        )
+
     with col2:
+        st.markdown(
+            """
+            <div class="feature-card">
+                <div class="feature-icon">⚡</div>
+                <div class="feature-title">Markowitz SLSQP Optimisation</div>
+            </div>
+        """,
+            unsafe_allow_html=True,
+        )
+
+    with col3:
+        st.markdown(
+            """
+            <div class="feature-card">
+                <div class="feature-icon">📊</div>
+                <div class="feature-title">Nifty 50 Backtesting</div>
+            </div>
+        """,
+            unsafe_allow_html=True,
+        )
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # Centered SSO Authentication Card
+    left_co, center_co, right_co = st.columns([1, 2, 1])
+
+    with center_co:
         if oauth2 is None:
             st.warning(
                 "⚠️ Entra ID Credentials missing in `secrets.toml` or environment variables.\n\n"
                 "To test locally without auth, set environment variable `BYPASS_AUTH=true`."
             )
         else:
-            st.info("🔐 Restricted Access: Please authenticate via Microsoft Entra ID to access portfolio analytics.")
+            st.info("🔒 **Restricted Access**: Please authenticate via Microsoft Entra ID to access portfolio analytics.")
             result = oauth2.authorize_button(
                 name="🔑 Sign in with Microsoft Entra ID",
                 redirect_uri=REDIRECT_URI,
@@ -240,7 +316,7 @@ def run_dashboard() -> None:
     available_dates = sorted(df["as_of_date"].unique(), reverse=True)
 
     # Date Selection Filter in Sidebar
-    st.sidebar.subheader("⚙️ Control Panel")
+    st.sidebar.subheader("⚙️️ Control Panel")
     selected_date = st.sidebar.selectbox(
         "Model Execution Date", options=available_dates, format_func=lambda d: d.strftime("%B %d, %Y")
     )
