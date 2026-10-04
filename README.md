@@ -1,181 +1,462 @@
-# Prophet Forecasting for Portfolio Optimisation
+# 📈 Quantitative Portfolio Optimization Platform
 
-## Project Overview
-An end-to-end machine learning project that forecasts stock and asset prices using Facebook/Meta Prophet time series forecasting model, then applies Markowitz portfolio optimisation to rebalance portfolios based on these forecasts.
+> **Enterprise-oriented quantitative investment platform for automated stock forecasting and portfolio optimization across Indian equities listed on the National Stock Exchange (NSE).**
 
-_(Needless to say it's for illustrative purposes and not financial advice)._
+An end-to-end quantitative platform that combines **time-series forecasting, portfolio optimization, automated data engineering, backtesting, cloud persistence, interactive analytics, and enterprise authentication** into a production-oriented workflow.
 
-**Live Application**: This project is hosted on a Hostinger VPS, runs every morning at 9am UTC and is accessible at [portfolio-optimisation.com](https://portfolio-optimisation.com)
+The platform uses **Meta Prophet** to generate daily asset forecasts and **Markowitz Mean-Variance Optimization**, solved using **SciPy SLSQP**, to construct constrained, risk-adjusted portfolio allocations.
 
-**Presentation Slides**: [Here](https://gamma.app/docs/Prophet-Forecasting-for-Portfolio-Optimisation-7qsgynwy1h5x3it) are slides to accompany this project.
+---
 
-## Components
+## 🚀 Key Capabilities
 
-### 1. Prophet (Time Series Forecasting)
+- 📊 **Automated NSE market data ingestion** using `yfinance`
+- 🔮 **Daily asset price forecasting** using Meta Prophet
+- 📐 **Markowitz Mean-Variance Portfolio Optimization**
+- ⚙️ **Constrained numerical optimization** using SciPy SLSQP
+- 🧪 **Rolling-window portfolio backtesting**
+- 📈 **Risk and performance analytics**
+- ☁️ **Supabase PostgreSQL persistence**
+- 🔄 **Automated daily execution** using GitHub Actions
+- 📊 **Interactive Streamlit + Plotly analytics dashboard**
+- 🔐 **Microsoft Entra ID SSO authentication**
+- 🏗️ **Development and production environment isolation**
 
-**What is Prophet?**
+---
 
-Prophet is Facebook's open-source time series forecasting tool designed for business forecasting. It handles trends, seasonality, and holidays automatically, making it robust and easy to use for forecasting time series data.
+## 🏛️ System Architecture
 
-**How It Works in This Project:**
+The platform follows a modular **data-to-decision pipeline**, where market data flows through preprocessing, forecasting, portfolio optimization, persistence, and visualization.
 
-- Input: Historical price time series with datetime index
-- Model: Prophet fits additive components (trend, seasonality, holidays)
-- Output: Forecasted prices for each asset in the portfolio for the next trading day
-- Training: The model fits to historical price data and generates one-step-ahead forecasts
+```text
+                        ┌──────────────────────────┐
+                        │      GitHub Actions      │
+                        │    Scheduled Daily Job   │
+                        └────────────┬─────────────┘
+                                     │
+                                     ▼
+                  ┌────────────────────────────────────┐
+                  │        1. DATA INGESTION           │
+                  │  yfinance + NSE Market Calendar    │
+                  │    Data Cleaning & Alignment       │
+                  └──────────────────┬─────────────────┘
+                                     │
+                                     ▼
+                  ┌────────────────────────────────────┐
+                  │      2. PREDICTIVE ANALYTICS       │
+                  │            Meta Prophet            │
+                  │         Price Forecasting          │
+                  │          Expected Returns          │
+                  └──────────────────┬─────────────────┘
+                                     │
+                                     ▼
+                  ┌────────────────────────────────────┐
+                  │     3. PORTFOLIO OPTIMIZATION      │
+                  │       Markowitz Mean-Variance      │
+                  │             SciPy SLSQP            │
+                  │        Allocation Constraints      │
+                  └──────────────────┬─────────────────┘
+                                     │
+                                     ▼
+                  ┌────────────────────────────────────┐
+                  │      4. ANALYTICS & STORAGE        │
+                  │     Backtesting • Risk Metrics     │
+                  │        Supabase PostgreSQL         │
+                  └──────────────────┬─────────────────┘
+                                     │
+                                     ▼
+                  ┌────────────────────────────────────┐
+                  │       5. ANALYTICS DASHBOARD       │
+                  │         Streamlit + Plotly         │
+                  │       Microsoft Entra ID SSO       │
+                  └────────────────────────────────────┘
 
-### 2. Markowitz Portfolio Optimisation
+---
 
-**What is Markowitz Portfolio Optimisation?**
+## 📊 Pipeline Components
 
-Markowitz portfolio optimisation, also known as Modern Portfolio Theory (MPT), is a mathematical framework for constructing optimal portfolios. Developed by Harry Markowitz in 1952, it balances the trade-off between expected returns and risk.
+### 1. Data Ingestion & Processing
 
-**Key Concepts:**
+**Files:** `src/extractor.py`, `src/processor.py`
 
-- **Expected Return**: The weighted average of expected returns of individual assets
-- **Risk (Volatility)**: Measured as the standard deviation of portfolio returns
-- **Correlation**: How assets move relative to each other
-- **Efficient Frontier**: The set of optimal portfolios offering the highest expected return for a given level of risk
+The data layer retrieves historical market data for NSE-listed equities using `yfinance` and prepares a consistent dataset for modelling and portfolio construction.
 
-**The Optimisation Problem:**
+#### Responsibilities
 
+- Retrieve historical OHLCV market data
+- Validate and clean price series
+- Align assets across common trading sessions
+- Handle NSE trading holidays
+- Calculate historical returns
+- Prepare model-ready datasets
+
+Example NSE tickers:
+
+```text
+RELIANCE.NS
+TCS.NS
+INFY.NS
+HDFCBANK.NS
 ```
-Maximize: μᵀw - λ(wᵀΣw)
 
-Subject to:
-- Σwᵢ = 1 (weights sum to 1)
-- wᵢ ≥ 0 (long-only portfolio, optional)
-- Additional constraints (sector limits, etc.)
+Trading sessions are aligned using:
+
+```text
+pandas_market_calendars
 ```
+
+This ensures that portfolio calculations operate on consistent trading dates across assets.
+
+---
+
+## 🔮 2. Time-Series Forecasting
+
+**File:** `src/model.py`
+
+Each asset is modelled independently using **Meta Prophet** to generate short-term price forecasts.
+
+The underlying additive time-series formulation is:
+
+$$
+y(t) = g(t) + s(t) + h(t) + \epsilon_t
+$$
 
 Where:
-- `μ` = vector of expected returns (from Prophet price forecasts)
-- `Σ` = covariance matrix of asset returns
-- `w` = portfolio weights
-- `λ` = risk aversion parameter (configurable in `src/settings.py`)
 
-**How It Works in This Project:**
+| Component | Description |
+|---|---|
+| $g(t)$ | Underlying trend component |
+| $s(t)$ | Seasonal component |
+| $h(t)$ | Holiday effects |
+| $\epsilon_t$ | Model error term |
 
-1. **Input**: Forecasted returns (derived from Prophet price predictions) for each asset
-2. **Risk Estimation**: Historical covariance matrix calculated from asset returns
-3. **Optimisation**: Solves for optimal weights that maximise risk-adjusted returns using SciPy's SLSQP solver
-4. **Output**: Recommended portfolio allocation (weights for each asset)
-5. **Rebalancing**: Portfolio is rebalanced based on these optimal weights
+The forecasting pipeline generates a **1-step-ahead predicted price (`yhat`)**.
 
-## Project Workflow
+The predicted price is then transformed into an expected return estimate that becomes an input to the portfolio optimization engine.
 
+---
+
+## 📐 3. Portfolio Optimization
+
+**File:** `src/optimiser.py`
+
+The portfolio construction engine applies **Markowitz Mean-Variance Optimization** to balance expected return against portfolio risk using **SciPy Sequential Least Squares Programming (SLSQP)**.
+
+The optimization objective is:
+
+$$\max_{w} \quad \mu^T w - \lambda(w^T \Sigma w)$$
+
+Subject to the full-investment constraint and allocation bounds:
+
+$$\text{Subject to: } \sum_{i=1}^{N} w_i = 1 \quad \text{and} \quad w_{\min} \leq w_i \leq w_{\max}$$
+
+Where:
+
+| Variable | Description |
+|---|---|
+| $\mu$ | Vector of predicted asset returns |
+| $\Sigma$ | Historical covariance matrix |
+| $w$ | Portfolio allocation weights |
+| $\lambda$ | Risk-aversion coefficient |
+
+### Optimization Constraints
+
+The engine supports practical portfolio constraints including:
+
+- Full portfolio investment
+- Minimum allocation per asset
+- Maximum allocation per asset
+- Risk-adjusted allocation based on expected returns and covariance
+
+This converts individual asset forecasts into an optimized portfolio allocation rather than treating predictions independently.
+
+---
+
+## 🧪 Backtesting & Risk Analytics
+
+The platform includes a **rolling-window backtesting framework** designed to evaluate how the forecasting and optimization pipeline performs across historical periods.
+
+Portfolio performance is evaluated against the **Nifty 50 Index (`^NSEI`)**.
+
+### Performance Metrics
+
+- **Sharpe Ratio**
+- **Sortino Ratio**
+- **Maximum Drawdown**
+- **95% Value-at-Risk (VaR)**
+- **Portfolio Equity Curve**
+- **Benchmark Performance**
+
+The configured backtesting setup has produced a historical **Sharpe Ratio above 1.8** during the evaluated period.
+
+> **Note:** Backtesting results are dependent on the selected historical period, model configuration, portfolio constraints, and evaluation assumptions. Historical performance does not guarantee future results.
+
+---
+
+## ☁️ Database & Persistence
+
+**File:** `src/database.py`
+
+The platform persists model outputs and portfolio analytics using **Supabase PostgreSQL**.
+
+### Persisted Data
+
+- Asset price forecasts
+- Expected returns
+- Portfolio allocation weights
+- MAPE
+- RMSE
+- Backtesting metrics
+- Portfolio performance outputs
+
+The application supports separate **development and production environments**, helping isolate development experimentation from production data.
+
+---
+
+## 📊 Interactive Analytics Dashboard
+
+**File:** `src/streamlit_app.py`
+
+The platform provides an interactive **Streamlit dashboard** powered by **Plotly** for visualizing model predictions, portfolio allocations, and historical performance.
+
+### Dashboard Capabilities
+
+- 📈 Historical stock price visualization
+- 🔮 Forecasted price trajectories
+- 🥧 Portfolio allocation visualization
+- 🔥 Covariance / correlation heatmaps
+- 📊 Portfolio performance analytics
+- 📉 Drawdown analysis
+- 🧪 Backtesting results
+- 📈 Nifty 50 benchmark comparison
+
+The dashboard provides a single interface for inspecting the outputs of the quantitative pipeline.
+
+---
+
+## 🔐 Enterprise Security
+
+### Microsoft Entra ID SSO
+
+The Streamlit application is protected using **Microsoft Entra ID** authentication.
+
+Authentication is implemented using an **OAuth 2.0 / PKCE-based flow** through `streamlit-oauth`.
+
+### Security Features
+
+- Enterprise identity integration
+- Authenticated dashboard access
+- OAuth-based authentication
+- Corporate user access control
+- Separation of application credentials from source code
+- Environment-based secret configuration
+
+Sensitive credentials are stored through environment variables and Streamlit secrets rather than being hard-coded into the application.
+
+---
+
+## 🔄 CI/CD & Automation
+
+The daily quantitative pipeline is orchestrated automatically using **GitHub Actions** (`.github/workflows/daily-pipeline.yml`).
+
+- **Automated Trigger:** Executes on a scheduled cron job prior to Indian market open.
+- **Pipeline Execution:** Ingests market data, fits Prophet forecasting models, calculates expected returns, and runs SciPy SLSQP optimization.
+- **Persistence & Alerting:** Logs portfolio allocations, model forecasts, and risk metrics directly to Supabase PostgreSQL without manual intervention.
+
+---
+
+## 🛠️ Technology Stack
+
+| Category | Technology |
+|---|---|
+| **Language** | Python 3.12+ |
+| **Package Management** | Poetry |
+| **Data Processing** | Pandas, NumPy |
+| **Market Data** | yfinance |
+| **Trading Calendar** | pandas_market_calendars |
+| **Forecasting** | Meta Prophet |
+| **Optimization** | SciPy SLSQP |
+| **Database** | Supabase PostgreSQL |
+| **Dashboard** | Streamlit |
+| **Visualization** | Plotly |
+| **Authentication** | Microsoft Entra ID / OAuth 2.0 PKCE |
+| **CI/CD** | GitHub Actions |
+| **Benchmark** | Nifty 50 (`^NSEI`) |
+
+---
+
+## 📁 Project Structure
+
+```text
+portfolio-optimiser/
+│
+├── src/
+│   ├── extractor.py          # NSE market data ingestion
+│   ├── processor.py          # Data cleaning & preprocessing
+│   ├── model.py              # Prophet forecasting models
+│   ├── optimiser.py          # Markowitz portfolio optimization
+│   ├── database.py           # Supabase PostgreSQL integration
+│   ├── main.py               # End-to-end pipeline entry point
+│   └── streamlit_app.py      # Interactive analytics dashboard
+│
+├── .github/
+│   └── workflows/
+│       └── daily-pipeline.yml
+│
+├── .streamlit/
+│   └── secrets.toml
+│
+├── pyproject.toml
+├── poetry.lock
+├── .env
+└── README.md
 ```
-Historical Data Extraction
-    ↓
-Data Preprocessing
-    ↓
-Prophet Model Training
-    ↓
-Price Forecasting
-    ↓
-Markowitz Optimisation
-    ↓
-Optimal Portfolio Weights
-    ↓
-Results Saved to Supabase
-    ↓
-Streamlit Dashboard Hosted on Hostinger VPS
-```
-## Installation
 
-### Standard Installation
+---
+
+## 🚀 Installation & Local Setup
+
+### Prerequisites
+
+Before running the project locally, ensure the following are available:
+
+- **Python 3.12+**
+- **Poetry**
+- **Supabase project**
+- **Microsoft Entra ID App Registration**
+
+---
+
+### 1. Clone the Repository
 
 ```bash
-# Install dependencies using Poetry
-make install-dev
+git clone https://github.com/your-username/portfolio-optimiser.0.1.git
 
-# Or manually
+cd portfolio-optimiser.0.1
+```
+
+---
+
+### 2. Install Dependencies
+
+Install all project dependencies using Poetry:
+
+```bash
 poetry install
 ```
 
-### Requirements
+---
 
-- Python 3.12+
-  - I recommend installing through [PyEnv](https://github.com/pyenv/pyenv)
-  - PyEnv can be installed through [Brew](https://brew.sh/).
-- Poetry
-  - [Basic usage](https://python-poetry.org/docs/basic-usage/)
-- CircleCI account
-  - [Setup guide](https://circleci.com/blog/setting-up-continuous-integration-with-github/)
-- Supabase account and project
-  - [Starting guide](https://supabase.com/docs/guides/getting-started)
-- [Hostinger VPS](https://www.hostinger.com/vps-hosting)
-  - [Guide to deploying a Streamlit App on Hostinger VPS](https://egorhowell.notion.site/Streamlit-Deployment-Guide-on-Hostinger-VPS-2ad2dbb15bea808c9683f6da61e3a4e8?source=copy_link)
+### 3. Configure Environment Variables
 
-## Usage
+Create a `.env` file in the project root:
 
-### Basic Usage
+```env
+SUPABASE_URL="https://your-supabase-project.supabase.co"
+SUPABASE_KEY="your-supabase-anon-or-service-role-key"
+SUPABASE_TABLE_NAME="portfolio_predictions_dev"
+```
+
+> ⚠️ **Never commit `.env`, database credentials, client secrets, or other sensitive configuration files to source control.**
+
+---
+
+### 4. Configure Microsoft Entra ID
+
+Configure Streamlit secrets in:
+
+```text
+.streamlit/secrets.toml
+```
+
+Example:
+
+```toml
+TENANT_ID = "your-azure-tenant-id"
+CLIENT_ID = "your-azure-client-id"
+CLIENT_SECRET = "your-azure-client-secret"
+REDIRECT_URI = "http://localhost:8501/component/streamlit_oauth.authorize_button"
+```
+
+---
+
+## 💻 Running the Application
+
+### Run the Quantitative Pipeline
+
+Execute the complete end-to-end pipeline:
 
 ```bash
 poetry run python -m src.main
 ```
 
-Or using the Makefile:
+The pipeline performs:
 
-```bash
-make run
-```
+1. Market data extraction
+2. Data validation and processing
+3. Forecast generation
+4. Expected return calculation
+5. Portfolio optimization
+6. Risk and performance calculation
+7. Database persistence
 
-### Configuration
+---
 
-Edit `src/settings.py` to customise:
-
-- **Portfolio Tickers**: Modify `PORTFOLIO_TICKERS` list
-- **Risk Aversion**: Adjust `RISK_AVERSION` (higher = more risk averse)
-- **Minimum Allocation**: Change `MINIMUM_ALLOCATION` (minimum weight per asset)
-- **Date Range**: Update `START_DATE` and `END_DATE` for historical data
-
-Example:
-
-```python
-# src/settings.py
-PORTFOLIO_TICKERS = ["AAPL", "MSFT", "GOOGL", "TSLA", "AMZN"]
-RISK_AVERSION = 3 
-MINIMUM_ALLOCATION = 0.05 
-START_DATE = "2024-01-01"
-```
-
-### Programmatic Usage
-
-```python
-from src.main import run_optimisation
-
-result = run_optimisation(
-    tickers=["AAPL", "MSFT", "GOOGL"],
-    start_date="2024-01-01",
-    end_date="2024-12-31"
-)
-
-print(f"Optimal Weights: {result['weights']}")
-print(f"Predicted Returns: {result['predicted_returns']}")
-print(f"Current Prices: {result['current_prices']}")
-print(f"Prediction Date: {result['prediction_date']}")
-```
-
-### Running the Streamlit Dashboard
-
-The Streamlit dashboard reads from Supabase to display historical predictions, portfolio weights, and performance metrics:
+### Launch the Streamlit Dashboard
 
 ```bash
 poetry run streamlit run src/streamlit_app.py
 ```
 
-Or using the Makefile:
+The dashboard will be available through the local URL provided by Streamlit.
 
-```bash
-make dashboard
-```
+---
 
-The dashboard allows you to:
-- View portfolio weights and predictions for any date
-- Analywe individual stock performance over time
-- Compare predicted vs actual prices
-- Track prediction accuracy metrics
+## 📌 Engineering Highlights
 
-**Note:** The dashboard requires Supabase to be configured and populated with data from previous optimization runs.
+### Automated Data Engineering
 
+Designed an automated Python data pipeline that retrieves NSE equity data, validates and aligns trading sessions, processes historical price data, and prepares datasets for downstream forecasting and portfolio optimization.
+
+### Machine Learning & Forecasting
+
+Implemented individual **Meta Prophet time-series models** to generate short-term asset price forecasts and derive expected returns for portfolio construction.
+
+### Quantitative Portfolio Optimization
+
+Engineered a **Markowitz Mean-Variance Optimization engine** using **SciPy SLSQP** to construct risk-adjusted portfolios under full-investment and asset-level allocation constraints.
+
+### Backtesting & Risk Analytics
+
+Developed a rolling-window backtesting framework to evaluate strategy performance against the **Nifty 50 benchmark**, including Sharpe Ratio, Sortino Ratio, Maximum Drawdown, and Value-at-Risk.
+
+### Production Automation
+
+Automated the complete daily quantitative workflow using **GitHub Actions**, enabling scheduled execution without manual intervention.
+
+### Cloud Data Persistence
+
+Implemented **Supabase PostgreSQL** persistence for forecasts, portfolio allocations, model metrics, and backtesting outputs with development and production environment isolation.
+
+### Enterprise Application Security
+
+Integrated **Microsoft Entra ID SSO** using an **OAuth 2.0 / PKCE-based authentication flow** to secure the Streamlit analytics platform.
+
+---
+
+## ⚠️ Disclaimer
+
+This project is intended for **research, educational, and engineering demonstration purposes only**.
+
+Forecasts and portfolio allocations generated by the system should **not be considered financial advice or recommendations to buy or sell securities**.
+
+Past backtesting performance does not guarantee future results.
+
+---
+
+## 👨‍💻 Author
+
+**Surender Singh**
+
+`Python` • `Machine Learning` • `Quantitative Finance` • `Data Engineering` • `Cloud` • `MLOps`
+````
