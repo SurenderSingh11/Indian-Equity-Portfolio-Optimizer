@@ -33,7 +33,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# Custom Styling (Dark Institutional Theme & Custom Landing UI)
+# Custom Styling (Dark Institutional Theme)
 st.markdown(
     """
     <style>
@@ -52,41 +52,6 @@ st.markdown(
         padding: 12px 16px;
         border: 1px solid #334155;
     }
-    /* Modern Landing UI CSS */
-    .login-header {
-        text-align: center;
-        padding-top: 2rem;
-        padding-bottom: 1rem;
-    }
-    .login-title {
-        font-size: 2.5rem;
-        font-weight: 700;
-        color: #FAFAFA;
-        margin-bottom: 0.5rem;
-    }
-    .login-subtitle {
-        font-size: 1.1rem;
-        color: #A0AAB8;
-        margin-bottom: 2rem;
-    }
-    .feature-card {
-        background-color: #1E222D;
-        border: 1px solid #2A2E39;
-        border-radius: 10px;
-        padding: 1.5rem 1rem;
-        text-align: center;
-        margin-bottom: 1rem;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-    }
-    .feature-icon {
-        font-size: 2rem;
-        margin-bottom: 0.5rem;
-    }
-    .feature-title {
-        font-size: 1.05rem;
-        font-weight: 600;
-        color: #E0E0E0;
-    }
     </style>
 """,
     unsafe_allow_html=True,
@@ -99,7 +64,6 @@ def get_secret(key: str, default: str = "") -> str:
         if key in st.secrets:
             return str(st.secrets[key])
     except Exception:
-        # Fallback if secrets.toml does not exist (e.g., local dev or GitHub Actions)
         pass
     return os.getenv(key, default)
 
@@ -111,9 +75,6 @@ CLIENT_SECRET = get_secret("CLIENT_SECRET")
 REDIRECT_URI = get_secret(
     "REDIRECT_URI", "http://localhost:8501/component/streamlit_oauth.authorize_button"
 )
-
-# Optional bypass flag for local dev or automated testing environments
-BYPASS_AUTH = get_secret("BYPASS_AUTH", "false").lower() in ("true", "1", "yes")
 
 AUTHORIZE_URL = f"https://login.microsoftonline.com/{TENANT_ID}/oauth2/v2.0/authorize" if TENANT_ID else ""
 TOKEN_URL = f"https://login.microsoftonline.com/{TENANT_ID}/oauth2/v2.0/token" if TENANT_ID else ""
@@ -151,105 +112,7 @@ def decode_jwt_payload(token_str: str) -> dict:
     return {}
 
 
-# --- 1. UNAUTHENTICATED LANDING VIEW ---
-if not st.session_state["auth_token"] and not BYPASS_AUTH:
-    # Main Landing Header
-    st.markdown(
-        """
-        <div class="login-header">
-            <div class="login-title">📈 Indian Equity Portfolio Optimizer</div>
-            <div class="login-subtitle">Meta Prophet Machine Learning & Markowitz Mean-Variance Framework (NSE India)</div>
-        </div>
-    """,
-        unsafe_allow_html=True,
-    )
-
-    # Feature Preview Cards (3 Columns)
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        st.markdown(
-            """
-            <div class="feature-card">
-                <div class="feature-icon">🔮</div>
-                <div class="feature-title">Prophet Price Forecasting</div>
-            </div>
-        """,
-            unsafe_allow_html=True,
-        )
-
-    with col2:
-        st.markdown(
-            """
-            <div class="feature-card">
-                <div class="feature-icon">⚡</div>
-                <div class="feature-title">Markowitz SLSQP Optimisation</div>
-            </div>
-        """,
-            unsafe_allow_html=True,
-        )
-
-    with col3:
-        st.markdown(
-            """
-            <div class="feature-card">
-                <div class="feature-icon">📊</div>
-                <div class="feature-title">Nifty 50 Backtesting</div>
-            </div>
-        """,
-            unsafe_allow_html=True,
-        )
-
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    # Centered SSO Authentication Card
-    left_co, center_co, right_co = st.columns([1, 2, 1])
-
-    with center_co:
-        if oauth2 is None:
-            st.warning(
-                "⚠️ Entra ID Credentials missing in `secrets.toml` or environment variables.\n\n"
-                "To test locally without auth, set environment variable `BYPASS_AUTH=true`."
-            )
-        else:
-            st.info("🔒 **Restricted Access**: Please authenticate via Microsoft Entra ID to access portfolio analytics.")
-            result = oauth2.authorize_button(
-                name="🔑 Sign in with Microsoft Entra ID",
-                redirect_uri=REDIRECT_URI,
-                scope="openid profile email https://graph.microsoft.com/User.Read",
-                key="entra_id_auth",
-            )
-
-            if result and "token" in result:
-                st.session_state["auth_token"] = result["token"]
-                st.rerun()
-
-    st.stop()
-
-
-# --- 2. AUTHENTICATED SIDEBAR & USER PROFILE ---
-if BYPASS_AUTH and not st.session_state["auth_token"]:
-    user_name = "Local Dev User"
-    user_email = "dev@localhost"
-else:
-    token_data = st.session_state["auth_token"]
-    id_token_str = token_data.get("id_token", "") if isinstance(token_data, dict) else ""
-    user_claims = decode_jwt_payload(id_token_str)
-    user_name = user_claims.get("name", "Authenticated User")
-    user_email = user_claims.get("preferred_username", user_claims.get("email", "Entra ID Account"))
-
-with st.sidebar:
-    st.title("🛡️ Enterprise Profile")
-    st.markdown(f"**{user_name}**")
-    st.caption(user_email)
-    if BYPASS_AUTH:
-        st.info("Dev Mode: Auth Bypassed")
-    else:
-        st.success("Authenticated via Entra ID SSO")
-    st.divider()
-
-
-# --- 3. DATA RETRIEVAL LAYER ---
+# --- DATA RETRIEVAL LAYER ---
 @st.cache_data(ttl=300)
 def load_supabase_predictions() -> pd.DataFrame:
     """Fetch recent model outputs from Supabase and parse price history arrays."""
@@ -303,8 +166,42 @@ def _parse_price_history(raw: object) -> list[float]:
     return []
 
 
-# --- 4. MAIN MULTI-TAB DASHBOARD ---
+# --- MAIN MULTI-TAB DASHBOARD ---
 def run_dashboard() -> None:
+    # 1. SIDEBAR PROFILE & AUTHENTICATION MANAGEMENT
+    with st.sidebar:
+        st.title("🛡️ Enterprise Access")
+        
+        if st.session_state["auth_token"]:
+            token_data = st.session_state["auth_token"]
+            id_token_str = token_data.get("id_token", "") if isinstance(token_data, dict) else ""
+            user_claims = decode_jwt_payload(id_token_str)
+            user_name = user_claims.get("name", "Authenticated User")
+            user_email = user_claims.get("preferred_username", user_claims.get("email", "Entra ID Account"))
+
+            st.markdown(f"**{user_name}**")
+            st.caption(user_email)
+            st.success("Authenticated via Entra ID SSO")
+            
+            if st.button("🚪 Sign Out", use_container_width=True):
+                st.session_state["auth_token"] = None
+                st.rerun()
+        else:
+            st.info("💡 **Guest Demo Access**: Public dashboard functions are enabled.")
+            if oauth2 is not None:
+                result = oauth2.authorize_button(
+                    name="🔑 Sign in with Entra ID",
+                    redirect_uri=REDIRECT_URI,
+                    scope="openid profile email https://graph.microsoft.com/User.Read",
+                    key="entra_id_auth",
+                )
+                if result and "token" in result:
+                    st.session_state["auth_token"] = result["token"]
+                    st.rerun()
+
+        st.divider()
+
+    # 2. HEADER & CAPTION
     st.title("📈 Indian Equity Portfolio Optimizer")
     st.caption("Automated Meta Prophet Price Predictions & SciPy SLSQP Mean-Variance Allocation")
 
@@ -322,10 +219,6 @@ def run_dashboard() -> None:
     )
 
     risk_free_rate = st.sidebar.number_input("Risk-Free Rate (%)", value=6.5, step=0.25) / 100
-
-    if st.sidebar.button("🚪 Sign Out", use_container_width=True):
-        st.session_state["auth_token"] = None
-        st.rerun()
 
     date_df = df[df["as_of_date"] == selected_date].copy().sort_values("portfolio_weight", ascending=False)
 
