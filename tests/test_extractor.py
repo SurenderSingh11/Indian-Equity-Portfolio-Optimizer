@@ -1,6 +1,6 @@
 """Tests for extractor module."""
 
-from datetime import date
+from unittest.mock import MagicMock, patch
 
 import pandas as pd
 
@@ -8,35 +8,49 @@ from src.extractor import extract_data
 
 
 class TestExtractor:
-    """Test data extraction."""
+    """Test market data extraction via direct v8 chart API."""
 
-    def test_extract_data(self) -> None:
-        """Test extracting historical data."""
-        tickers = ["MSFT", "AAPL"]
-        data = extract_data(tickers, start_date="2024-01-01")
+    @patch("requests.Session.get")
+    def test_extract_data_success(self, mock_get: MagicMock) -> None:
+        """Test successfully parsing raw Yahoo Finance v8 JSON payload."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "chart": {
+                "result": [
+                    {
+                        "timestamps": [1700000000, 1700086400],
+                        "indicators": {
+                            "quote": [{"close": [100.0, 105.0]}],
+                            "adjclose": [{"adjclose": [100.0, 105.0]}],
+                        },
+                    }
+                ]
+            }
+        }
+        mock_get.return_value = mock_response
+
+        tickers = ["RELIANCE.NS"]
+        data = extract_data(tickers, start_date="2024-01-01", end_date="2024-01-05")
 
         assert isinstance(data, dict)
-        assert len(data) > 0
-        for ticker in tickers:
-            if ticker in data:
-                assert isinstance(data[ticker], pd.DataFrame)
-                assert "Price" in data[ticker].columns
-                assert "Returns" in data[ticker].columns
-                assert data[ticker].index.name == "Date"
-                # Check that index is date type
-                assert all(isinstance(d, date) for d in data[ticker].index)
+        assert "RELIANCE.NS" in data
+        df = data["RELIANCE.NS"]
+        assert isinstance(df, pd.DataFrame)
+        assert "Price" in df.columns
+        assert "Returns" in df.columns
+        assert len(df) > 0
 
-    def test_extract_data_with_end_date(self) -> None:
-        """Test extracting data with end_date filter."""
-        tickers = ["KO"]
-        end_date = "2024-06-01"
-        data = extract_data(tickers, start_date="2024-01-01", end_date=end_date)
+    @patch("requests.Session.get")
+    def test_extract_data_rate_limit_and_failure(
+        self, mock_get: MagicMock
+    ) -> None:
+        """Test resilience to 429 rate limit responses returning empty result set."""
+        mock_response = MagicMock()
+        mock_response.status_code = 429
+        mock_get.return_value = mock_response
+
+        data = extract_data(["INVALID.NS"], start_date="2024-01-01", end_date="2024-01-05")
 
         assert isinstance(data, dict)
-        if tickers[0] in data:
-            assert isinstance(data[tickers[0]], pd.DataFrame)
-            # Check that all dates are <= end_date
-            if len(data[tickers[0]]) > 0:
-                assert all(
-                    pd.Timestamp(d) <= pd.Timestamp(end_date) for d in data[tickers[0]].index
-                )
+        assert len(data) == 0

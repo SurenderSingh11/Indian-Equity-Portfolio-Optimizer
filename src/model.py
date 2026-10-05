@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from datetime import date
+from typing import Any
 
 import pandas as pd
 import pandas_market_calendars as mcal
@@ -34,30 +35,50 @@ def _get_indian_trading_holidays(start_year: int = 2020, end_year: int = 2030) -
     start = pd.Timestamp(date(start_year, 1, 1))
     end = pd.Timestamp(date(end_year, 12, 31))
 
+    empty_df = pd.DataFrame({
+        "holiday": pd.Series(dtype="str"),
+        "ds": pd.Series(dtype="datetime64[ns]"),
+        "lower_window": pd.Series(dtype="int64"),
+        "upper_window": pd.Series(dtype="int64"),
+    })
+
     try:
         calendar = mcal.get_calendar(EXCHANGE_CALENDAR)
     except Exception as e:
         logger.warning(f"Could not load calendar '{EXCHANGE_CALENDAR}': {e}. Falling back to default holidays.")
-        return pd.DataFrame(columns=["holiday", "ds", "lower_window", "upper_window"])
+        return empty_df
 
-    holidays: list[dict[str, pd.Timestamp]] = []
+    holidays: list[dict[str, Any]] = []
     seen: set[tuple[str, pd.Timestamp]] = set()
 
+    # 1. Parse regular holidays
     if getattr(calendar, "regular_holidays", None) is not None:
-        for rule in calendar.regular_holidays.rules:
+        for rule in getattr(calendar.regular_holidays, "rules", []):
             name = _normalise_holiday_name(getattr(rule, "name", "holiday"))
             for holiday_date in rule.dates(start, end):
                 timestamp = pd.Timestamp(holiday_date).normalize()
                 if timestamp.tz is not None:
                     timestamp = timestamp.tz_localize(None)
                 key = (name, timestamp)
-                if key in seen:
-                    continue
-                seen.add(key)
-                holidays.append({"holiday": name, "ds": timestamp})
+                if key not in seen:
+                    seen.add(key)
+                    holidays.append({"holiday": name, "ds": timestamp})
+
+    # 2. Parse ad-hoc / market holidays directly from calendar
+    try:
+        holidays_index = calendar.holidays().holidays
+        for h_date in holidays_index:
+            timestamp = pd.Timestamp(h_date).normalize()
+            if start <= timestamp <= end:
+                key = ("nse_trading_holiday", timestamp)
+                if key not in seen:
+                    seen.add(key)
+                    holidays.append({"holiday": "nse_trading_holiday", "ds": timestamp})
+    except Exception as e:
+        logger.debug(f"Ad-hoc holiday extraction skipped: {e}")
 
     if not holidays:
-        return pd.DataFrame(columns=["holiday", "ds", "lower_window", "upper_window"])
+        return empty_df
 
     holidays_df = pd.DataFrame(holidays).drop_duplicates(subset=["holiday", "ds"])
     holidays_df = holidays_df.sort_values("ds").reset_index(drop=True)

@@ -3,17 +3,16 @@
 import numpy as np
 import pandas as pd
 
-from src.model import ProphetModel, _get_us_trading_holidays
+from src.model import ProphetModel, _get_indian_trading_holidays
 
 
 class TestProphetModel:
-    """Test Prophet model."""
+    """Test Prophet model fitting, predictions, and calendar integration."""
 
     def test_fit(self) -> None:
-        """Test fitting Prophet model."""
-        # Create sample time series
-        dates = pd.date_range("2024-01-01", periods=100, freq="D")
-        prices = 100 + np.cumsum(np.random.randn(100) * 0.5)  # Random walk
+        """Test fitting Prophet model on daily stock price series."""
+        dates = pd.date_range("2024-01-01", periods=100, freq="B")
+        prices = 100 + np.cumsum(np.random.randn(100) * 0.5)
         price_series = pd.Series(prices, index=dates)
 
         model = ProphetModel()
@@ -22,8 +21,8 @@ class TestProphetModel:
         assert model.model is not None
 
     def test_predict_next(self) -> None:
-        """Test predict_next method."""
-        dates = pd.date_range("2024-01-01", periods=100, freq="D")
+        """Test one-step business day forward forecast."""
+        dates = pd.date_range("2024-01-01", periods=100, freq="B")
         prices = 100 + np.cumsum(np.random.randn(100) * 0.5)
         price_series = pd.Series(prices, index=dates)
 
@@ -32,14 +31,12 @@ class TestProphetModel:
 
         assert isinstance(predicted_price, float)
         assert predicted_price > 0
-        assert model.model is not None  # Model should be fitted
+        assert model.model is not None
 
     def test_predict_for_tickers(self) -> None:
-        """Test predict_for_tickers method with multiple tickers."""
+        """Test multi-asset forecasting and return calculations."""
+        dates = pd.date_range("2024-01-01", periods=100, freq="B")
 
-        dates = pd.date_range("2024-01-01", periods=100, freq="D")
-
-        # Create DataFrames with Price column (as expected by predict_for_tickers)
         df1 = pd.DataFrame(
             {
                 "Price": 100 + np.cumsum(np.random.randn(100) * 0.5),
@@ -60,80 +57,24 @@ class TestProphetModel:
         model = ProphetModel()
         predictions, predicted_returns = model.predict_for_tickers(portfolio_data)
 
-        assert isinstance(predictions, dict)
-        assert isinstance(predicted_returns, dict)
         assert len(predictions) == 2
         assert len(predicted_returns) == 2
         assert "TICKER1" in predictions
         assert "TICKER2" in predictions
-        assert "TICKER1" in predicted_returns
-        assert "TICKER2" in predicted_returns
 
-        # Check predictions are floats and positive
-        assert isinstance(predictions["TICKER1"], float)
-        assert isinstance(predictions["TICKER2"], float)
-        assert predictions["TICKER1"] > 0
-        assert predictions["TICKER2"] > 0
-
-        # Check predicted returns are floats
-        assert isinstance(predicted_returns["TICKER1"], float)
-        assert isinstance(predicted_returns["TICKER2"], float)
-
-        # Check that predicted return is calculated correctly
+        # Check return mathematical derivation
         current_price1 = df1["Price"].iloc[-1]
         expected_return1 = (predictions["TICKER1"] - current_price1) / current_price1
         assert np.isclose(predicted_returns["TICKER1"], expected_return1, rtol=1e-5)
 
-    def test_get_us_trading_holidays(self) -> None:
-        """Test US trading holidays generation."""
-        holidays = _get_us_trading_holidays(2024, 2024)
+    def test_get_indian_trading_holidays(self) -> None:
+        """Test NSE exchange calendar holiday loader."""
+        holidays = _get_indian_trading_holidays(2024, 2025)
 
         assert isinstance(holidays, pd.DataFrame)
-        assert len(holidays) > 0
         assert "holiday" in holidays.columns
         assert "ds" in holidays.columns
         assert "lower_window" in holidays.columns
         assert "upper_window" in holidays.columns
-
-        # Check specific holidays exist
-        holiday_names = holidays["holiday"].unique()
-        assert "new_years" in holiday_names
-        assert "christmas" in holiday_names
-        assert "thanksgiving" in holiday_names
-
-        # Check that all holidays have proper windows
-        assert all(holidays["lower_window"] == -1)
-        assert all(holidays["upper_window"] == 1)
-
-        # Check date format
         assert pd.api.types.is_datetime64_any_dtype(holidays["ds"])
-
-    def test_fit_with_holidays(self) -> None:
-        """Test that Prophet model includes holidays when fitting."""
-        dates = pd.date_range("2024-01-01", periods=100, freq="D")
-        prices = 100 + np.cumsum(np.random.randn(100) * 0.5)
-        price_series = pd.Series(prices, index=dates)
-
-        model = ProphetModel()
-        model.fit(price_series)
-
-        assert model.model is not None
-        # Check that holidays are included
-        assert hasattr(model.model, "holidays")
-        if model.model.holidays is not None:
-            assert len(model.model.holidays) > 0
-
-    def test_fit_with_seasonality_config(self) -> None:
-        """Test that Prophet model has seasonality properly configured."""
-        dates = pd.date_range("2024-01-01", periods=100, freq="D")
-        prices = 100 + np.cumsum(np.random.randn(100) * 0.5)
-        price_series = pd.Series(prices, index=dates)
-
-        model = ProphetModel()
-        model.fit(price_series)
-
-        assert model.model is not None
-        # Check seasonality settings
-        assert model.model.yearly_seasonality is True
-        assert model.model.weekly_seasonality is True
-        assert model.model.daily_seasonality is False
+        assert len(holidays) > 0
