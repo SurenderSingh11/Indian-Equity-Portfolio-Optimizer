@@ -8,6 +8,13 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 
+def clean_ticker_symbol(ticker: str) -> str:
+    """Remove exchange identifiers (.NS, .BO) for clean UI presentation."""
+    if not ticker:
+        return ""
+    return ticker.replace(".NS", "").replace(".BO", "").strip()
+
+
 def preprocess_data(all_stock_data: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     """Align multiple tickers by common trading dates."""
     if not all_stock_data:

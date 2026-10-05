@@ -23,6 +23,7 @@ import streamlit as st
 from streamlit_oauth import OAuth2Component
 
 from src.database import get_supabase_client
+from src.processor import clean_ticker_symbol
 from src.settings import SUPABASE_TABLE_NAME
 
 # Page Configuration
@@ -221,11 +222,14 @@ def run_dashboard() -> None:
     risk_free_rate = st.sidebar.number_input("Risk-Free Rate (%)", value=6.5, step=0.25) / 100
 
     date_df = df[df["as_of_date"] == selected_date].copy().sort_values("portfolio_weight", ascending=False)
+    
+    # Add clean ticker column for UI rendering
+    date_df["display_ticker"] = date_df["ticker"].apply(clean_ticker_symbol)
 
     # Key Performance Indicators
     weighted_return = (date_df["predicted_return"] * date_df["portfolio_weight"]).sum() * 100
     top_holding = date_df.iloc[0]
-    top_ticker = top_holding["ticker"]
+    top_ticker = top_holding["display_ticker"]
     top_weight = top_holding["portfolio_weight"] * 100
 
     kpi1, kpi2, kpi3, kpi4 = st.columns(4)
@@ -251,7 +255,7 @@ def run_dashboard() -> None:
         with col_chart:
             fig_pie = px.pie(
                 date_df,
-                names="ticker",
+                names="display_ticker",
                 values="portfolio_weight",
                 hole=0.45,
                 color_discrete_sequence=px.colors.qualitative.Dark24,
@@ -271,7 +275,7 @@ def run_dashboard() -> None:
             st.plotly_chart(fig_pie, use_container_width=True)
 
         with col_table:
-            table_df = date_df[["ticker", "predicted_price", "predicted_return", "portfolio_weight"]].copy()
+            table_df = date_df[["display_ticker", "predicted_price", "predicted_return", "portfolio_weight"]].copy()
             table_df["predicted_return"] = table_df["predicted_return"] * 100
             table_df["portfolio_weight"] = table_df["portfolio_weight"] * 100
             table_df.columns = ["Ticker", "Predicted Price", "Expected Return", "Target Weight"]
@@ -330,8 +334,11 @@ def run_dashboard() -> None:
     with tab_risk:
         st.subheader("Asset Risk Profiles & Variance Matrix")
 
-        selected_ticker = st.selectbox("Select Asset for 30-Day Trajectory Analysis", options=date_df["ticker"].unique())
-        ticker_row = date_df[date_df["ticker"] == selected_ticker].iloc[0]
+        selected_ticker_clean = st.selectbox(
+            "Select Asset for 30-Day Trajectory Analysis", 
+            options=date_df["display_ticker"].unique()
+        )
+        ticker_row = date_df[date_df["display_ticker"] == selected_ticker_clean].iloc[0]
         prices = ticker_row.get("actual_prices_last_month", [])
 
         if prices:
@@ -340,13 +347,13 @@ def run_dashboard() -> None:
                 go.Scatter(
                     y=prices,
                     mode="lines+markers",
-                    name=selected_ticker,
+                    name=selected_ticker_clean,
                     line=dict(color="#38BDF8", width=2.5),
                     marker=dict(size=5, color="#F59E0B")
                 )
             )
             history_fig.update_layout(
-                title=f"30-Day Historical Closing Trajectory — {selected_ticker}",
+                title=f"30-Day Historical Closing Trajectory — {selected_ticker_clean}",
                 yaxis_title="Closing Price (INR ₹)",
                 xaxis_title="Trading Session (Days)",
                 height=350,
@@ -359,13 +366,13 @@ def run_dashboard() -> None:
             st.info("No detailed price historical array available for this asset.")
 
         st.markdown("##### Asset Co-movement Matrix (Covariance)")
-        tickers = date_df["ticker"].tolist()
-        cov_matrix = np.corrcoef(np.random.randn(len(tickers), 30))
+        display_tickers = date_df["display_ticker"].tolist()
+        cov_matrix = np.corrcoef(np.random.randn(len(display_tickers), 30))
 
         fig_cov = px.imshow(
             cov_matrix,
-            x=tickers,
-            y=tickers,
+            x=display_tickers,
+            y=display_tickers,
             color_continuous_scale="Blues",
             aspect="auto",
             text_auto=".2f"
