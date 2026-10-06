@@ -12,5 +12,5 @@ jobs:
     steps:
       - name: Ping Streamlit App
         run: |
-          curl -sL https://indian-equity-portfolio-optimizer-live.streamlit.app > /dev/null
+          python -c "import urllib.request; req = urllib.request.Request('https://indian-equity-portfolio-optimizer-live.streamlit.app', headers={'User-Agent': 'Mozilla/5.0'}); print(urllib.request.urlopen(req).getcode())"
           echo "Pinged Streamlit App successfully!"
