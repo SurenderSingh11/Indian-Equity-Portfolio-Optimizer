@@ -10,7 +10,37 @@ jobs:
   ping-app:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Streamlit App
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Ping Streamlit App Healthcheck
         run: |
-          python -c "import urllib.request; req = urllib.request.Request('https://indian-equity-portfolio-optimizer-live.streamlit.app', headers={'User-Agent': 'Mozilla/5.0'}); print(urllib.request.urlopen(req).getcode())"
-          echo "Pinged Streamlit App successfully!"
+          python -c "
+          import requests
+
+          headers = {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'Accept': '*/*'
+          }
+
+          urls = [
+              'https://indian-equity-portfolio-optimizer-live.streamlit.app/_stcore/health',
+              'https://indian-equity-portfolio-optimizer-live.streamlit.app/'
+          ]
+
+          session = requests.Session()
+          session.headers.update(headers)
+
+          for url in urls:
+              try:
+                  res = session.get(url, allow_redirects=True, timeout=15)
+                  print(f'URL: {url} -> Status: {res.status_code}')
+              except Exception as e:
+                  print(f'Failed {url}: {e}')
+          "
+          echo "Keep-alive ping completed!"
