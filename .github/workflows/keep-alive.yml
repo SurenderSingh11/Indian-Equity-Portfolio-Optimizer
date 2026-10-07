@@ -2,8 +2,8 @@ name: Keep Streamlit App Awake
 
 on:
   schedule:
-    # Runs daily at 00:00 UTC
-    - cron: '0 0 * * *'
+    # Runs twice daily at 00:00 and 12:00 UTC to keep the container warm
+    - cron: '0 0,12 * * *'
   workflow_dispatch:
 
 jobs:
@@ -15,32 +15,37 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install dependencies
-        run: pip install requests
+      - name: Install Playwright & Chromium
+        run: |
+          pip install playwright
+          playwright install --with-deps chromium
 
-      - name: Ping Streamlit App Healthcheck
+      - name: Open App and Auto-Wake If Sleeping
         run: |
           python -c "
-          import requests
+          import time
+          from playwright.sync_api import sync_playwright
 
-          headers = {
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-              'Accept': '*/*'
-          }
+          app_url = 'https://indian-equity-portfolio-optimizer-live.streamlit.app/'
 
-          urls = [
-              'https://indian-equity-portfolio-optimizer-live.streamlit.app/_stcore/health',
-              'https://indian-equity-portfolio-optimizer-live.streamlit.app/'
-          ]
+          with sync_playwright() as p:
+              browser = p.chromium.launch(headless=True)
+              page = browser.new_page()
+              
+              print(f'Navigating to {app_url}...')
+              page.goto(app_url, wait_until='networkidle', timeout=60000)
+              time.sleep(5)
 
-          session = requests.Session()
-          session.headers.update(headers)
+              # Look for Streamlit wake button
+              wake_button = page.get_by_role('button', name='Yes, get this app back up!')
+              
+              if wake_button.is_visible():
+                  print('Sleeping screen detected! Clicking wake button...')
+                  wake_button.click()
+                  time.sleep(10) # Allow container time to boot
+                  print('App woken up successfully!')
+              else:
+                  print('App is already awake and active!')
 
-          for url in urls:
-              try:
-                  res = session.get(url, allow_redirects=True, timeout=15)
-                  print(f'URL: {url} -> Status: {res.status_code}')
-              except Exception as e:
-                  print(f'Failed {url}: {e}')
+              browser.close()
           "
-          echo "Keep-alive ping completed!"
